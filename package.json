@@ -15,12 +15,13 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts",
+    "db:migrate": "tsx scripts/run-migrate.ts",
+    "db:seed": "tsx scripts/run-seed.ts",
     "auth:hash": "tsx scripts/hash-password.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
+    "@next/env": "^16.3.1",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
