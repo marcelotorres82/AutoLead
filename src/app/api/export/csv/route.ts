@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { generateCsv } from "@/lib/csv";
+import { listCompanies } from "@/lib/company-repository";
 import { demoCompanies } from "@/lib/demo-data";
+import { demoMode } from "@/lib/env";
 export async function GET() {
   if (!(await getSession()))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const companyList = demoMode ? demoCompanies : await listCompanies();
   const csv = generateCsv(
-    demoCompanies.map((c) => ({
+    companyList.map((c) => ({
       nome: c.name,
       dominio: c.domain,
       vertical: c.vertical,

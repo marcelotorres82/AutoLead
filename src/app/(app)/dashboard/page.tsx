@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -10,6 +11,7 @@ import {
   Play,
   XCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useDemoStore } from "@/components/demo-store";
 import { PageHeading } from "@/components/page-heading";
 import { Progress } from "@/components/progress";
@@ -18,7 +20,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { countsTowardGoal, lushaMetrics } from "@/lib/domain";
 export default function Dashboard() {
-  const { companies, lushaUsed, generate } = useDemoStore();
+  const { companies, lushaUsed, generate, demoMode } = useDemoStore();
+  const [isResearching, setIsResearching] = useState(false);
   const reviewed = companies.filter((c) => countsTowardGoal(c.status)).length;
   const approved = companies.filter(
     (c) => c.status === "Aprovada para pesquisar leads",
@@ -62,17 +65,43 @@ export default function Dashboard() {
         title="Visão geral"
         description="Priorize as melhores contas e acompanhe seu ritmo semanal."
         action={
-          <Button onClick={generate}>
+          <Button
+            disabled={isResearching}
+            onClick={async () => {
+              setIsResearching(true);
+              try {
+                const result = await generate();
+                toast.success(
+                  `${result.created} empresas adicionadas pela pesquisa`,
+                );
+              } catch (error) {
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : "Falha ao executar pesquisa",
+                );
+              } finally {
+                setIsResearching(false);
+              }
+            }}
+          >
             <Play className="size-4" />
-            Iniciar pesquisa de hoje
+            {isResearching ? "Pesquisando…" : "Iniciar pesquisa de hoje"}
           </Button>
         }
       />
-      <div className="mb-5 rounded-xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-950 dark:border-cyan-900 dark:bg-cyan-950/40 dark:text-cyan-100">
-        <strong>Modo demonstração.</strong> Todos os fatos, fontes e empresas
-        desta sessão são fictícios. Configure as integrações para iniciar
-        pesquisas públicas reais.
-      </div>
+      {demoMode ? (
+        <div className="mb-5 rounded-xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-950 dark:border-cyan-900 dark:bg-cyan-950/40 dark:text-cyan-100">
+          <strong>Modo demonstração.</strong> Todos os fatos, fontes e empresas
+          desta sessão são fictícios. Configure as integrações para iniciar
+          pesquisas públicas reais.
+        </div>
+      ) : (
+        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
+          <strong>Pesquisa pública ativa.</strong> Resultados são fundamentados
+          em fontes Tavily, analisados pela OpenAI e persistidos no Neon.
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map(({ label, value, icon: Icon, style }) => (
           <Card key={label}>

@@ -8,7 +8,7 @@ const responseSchema = z.object({
       title: z.string(),
       url: z.string().url(),
       content: z.string(),
-      published_date: z.string().optional(),
+      published_date: z.string().nullish(),
     }),
   ),
 });
@@ -39,7 +39,7 @@ export class TavilySearchProvider implements WebSearchProvider {
           title: item.title,
           url: assertSafePublicUrl(item.url).toString(),
           content: item.content,
-          publishedAt: item.published_date,
+          publishedAt: item.published_date ?? undefined,
         }));
     } finally {
       clearTimeout(timer);

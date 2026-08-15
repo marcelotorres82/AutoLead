@@ -1,4 +1,4 @@
-import type { Company } from "@/lib/domain";
+import type { AnalyzedCompany } from "@/lib/domain";
 export type SearchResult = {
   title: string;
   url: string;
@@ -11,7 +11,7 @@ export interface WebSearchProvider {
 }
 export interface AiProvider {
   readonly name: string;
-  analyzeBatch(results: SearchResult[]): Promise<Company[]>;
+  analyzeBatch(results: SearchResult[]): Promise<AnalyzedCompany[]>;
 }
 export interface BackupStorage {
   put(path: string, body: string): Promise<{ pathname: string; size: number }>;

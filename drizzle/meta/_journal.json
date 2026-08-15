@@ -8,6 +8,13 @@
       "when": 1786670092281,
       "tag": "0000_careful_maestro",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786802242388,
+      "tag": "0001_shiny_shocker",
+      "breakpoints": true
     }
   ]
 }

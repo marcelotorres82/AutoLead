@@ -75,6 +75,41 @@ export const companySchema = z.object({
 });
 export type Company = z.infer<typeof companySchema>;
 
+export const analyzedEvidenceSchema = z.object({
+  kind: z.enum(["fact", "signal", "hypothesis"]),
+  content: z.string().min(10).max(600),
+  sourceUrl: z.string().url(),
+});
+
+export const analyzedCompanySchema = z.object({
+  name: z.string().min(2).max(200),
+  tradeName: z.string().max(200),
+  domain: z.string().min(3).max(253),
+  vertical: z.string().min(2).max(100),
+  subsegment: z.string().min(2).max(120),
+  city: z.string().max(100),
+  state: z.string().max(100),
+  country: z.string().min(2).max(100),
+  size: z.string().min(2).max(100),
+  employees: z.string().max(100),
+  description: z.string().min(20).max(800),
+  solution: z.enum(solutions),
+  apiScore: z.number().int().min(0).max(100),
+  waapScore: z.number().int().min(0).max(100),
+  guardicoreScore: z.number().int().min(0).max(100),
+  breakdown: scoreBreakdownSchema,
+  recommendation: z.string().min(20).max(800),
+  evidence: z.array(analyzedEvidenceSchema).min(1).max(12),
+  titles: z.array(z.string().min(2).max(100)).max(12),
+  navigatorQuery: z.string().min(5).max(800),
+  tags: z.array(z.string().min(2).max(50)).max(12),
+});
+
+export const aiBatchAnalysisSchema = z.object({
+  companies: z.array(analyzedCompanySchema).max(30),
+});
+export type AnalyzedCompany = z.infer<typeof analyzedCompanySchema>;
+
 export const aiBatchResultSchema = z.object({
   companies: z.array(companySchema).max(100),
 });

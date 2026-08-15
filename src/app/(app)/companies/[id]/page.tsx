@@ -63,9 +63,17 @@ export default function CompanyDetail() {
           aria-label="Alterar status"
           className="h-10 rounded-lg border bg-white px-3 text-sm dark:bg-slate-900"
           value={c.status}
-          onChange={(e) => {
-            updateStatus(c.id, e.target.value as typeof c.status);
-            toast.success("Status atualizado");
+          onChange={async (e) => {
+            try {
+              await updateStatus(c.id, e.target.value as typeof c.status);
+              toast.success("Status atualizado");
+            } catch (error) {
+              toast.error(
+                error instanceof Error
+                  ? error.message
+                  : "Falha ao atualizar status",
+              );
+            }
           }}
         >
           {companyStatuses.map((s) => (

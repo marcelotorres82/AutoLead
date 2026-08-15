@@ -106,6 +106,7 @@ export const companies = pgTable(
     recommendation: text("recommendation"),
     status: companyStatusEnum("status").notNull().default("Nova"),
     notes: text("notes"),
+    analysisMetadata: jsonb("analysis_metadata"),
     discoveredAt: timestamp("discovered_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

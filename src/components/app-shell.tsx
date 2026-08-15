@@ -33,7 +33,13 @@ const nav = [
   { href: "/backups", label: "Backups", icon: DatabaseBackup },
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  demoMode,
+}: {
+  children: React.ReactNode;
+  demoMode: boolean;
+}) {
   const path = usePathname();
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
@@ -67,12 +73,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         ))}
       </nav>
-      <div className="m-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-xs">
-        <p className="font-semibold text-cyan-300">Modo demonstração</p>
-        <p className="mt-1 text-slate-400">
-          Dados fictícios. Integrações reais desativadas.
-        </p>
-      </div>
+      {demoMode ? (
+        <div className="m-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-xs">
+          <p className="font-semibold text-cyan-300">Modo demonstração</p>
+          <p className="mt-1 text-slate-400">
+            Dados fictícios. Integrações reais desativadas.
+          </p>
+        </div>
+      ) : (
+        <div className="m-3 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-xs">
+          <p className="font-semibold text-emerald-300">Integrações ativas</p>
+          <p className="mt-1 text-slate-400">
+            Pesquisa pública com Tavily, OpenAI e Neon.
+          </p>
+        </div>
+      )}
     </aside>
   );
   return (

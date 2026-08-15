@@ -24,9 +24,15 @@ export function CompanyTable() {
       ),
     [companies, query, status, min],
   );
-  const change = (id: string, value: CompanyStatus) => {
-    updateStatus(id, value);
-    toast.success(`Status alterado para ${value}`);
+  const change = async (id: string, value: CompanyStatus) => {
+    try {
+      await updateStatus(id, value);
+      toast.success(`Status alterado para ${value}`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Falha ao atualizar status",
+      );
+    }
   };
   return (
     <>
