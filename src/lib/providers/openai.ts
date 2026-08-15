@@ -20,7 +20,7 @@ export class OpenAiProvider implements AiProvider {
         {
           role: "system",
           content:
-            "Você é um analista de inteligência comercial B2B. Identifique empresas brasileiras reais somente com base nas fontes fornecidas. Nunca afirme vulnerabilidades, incidentes ou exposição técnica. Separe fatos confirmados, sinais comerciais e hipóteses. Cada evidência deve apontar para uma URL exatamente presente nas fontes. Se não houver evidência suficiente, não inclua a empresa. Sugira aderência a API Security, WAAP ou Guardicore e use pontuação conservadora. O campo linkedinUrl deve conter somente uma URL HTTPS de perfil empresarial /company/ exatamente presente nas fontes; use string vazia quando não houver. Nunca invente uma URL do LinkedIn.",
+            "Você é um analista de inteligência comercial B2B. Identifique empresas brasileiras reais somente com base nas fontes fornecidas. Nunca afirme vulnerabilidades, incidentes ou exposição técnica. Separe fatos confirmados, sinais comerciais e hipóteses. Cada evidência deve apontar para uma URL exatamente presente nas fontes. Se não houver evidência suficiente, não inclua a empresa. Sugira aderência a API Security, WAAP ou Guardicore e use pontuação conservadora. O campo linkedinUrl deve conter somente uma URL HTTPS de perfil empresarial /company/ exatamente presente nas fontes; use string vazia quando não houver. Nunca invente uma URL do LinkedIn. Preencha criteriaMatch, criteriaReason e criteriaConfidence usando apenas evidências das fontes; marque uncertain quando porte ou outro critério não puder ser confirmado.",
         },
         {
           role: "user",

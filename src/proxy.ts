@@ -6,6 +6,7 @@ export async function proxy(request: NextRequest) {
   if (
     publicPaths.some((item) => path.startsWith(item)) ||
     path.startsWith("/_next") ||
+    path.startsWith("/.well-known/workflow/") ||
     path === "/favicon.ico" ||
     path.startsWith("/api/cron")
   )
@@ -16,4 +17,8 @@ export async function proxy(request: NextRequest) {
   if (!session) return NextResponse.redirect(new URL("/login", request.url));
   return NextResponse.next();
 }
-export const config = { matcher: ["/((?!_next/static|_next/image).*)"] };
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.well-known/workflow/).*)",
+  ],
+};

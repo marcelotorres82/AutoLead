@@ -12,5 +12,6 @@ export default defineConfig([
     "coverage/**",
     "playwright-report/**",
     "test-results/**",
+    "src/app/.well-known/workflow/**",
   ]),
 ]);

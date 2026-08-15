@@ -14,24 +14,30 @@ export default function PersonasPage() {
     useDemoStore();
   const [open, setOpen] = useState(false);
   const lusha = lushaMetrics(lushaUsed, 300);
-  function submit(e: React.FormEvent<HTMLFormElement>) {
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
-    addPersona({
-      name: String(data.get("name")),
-      title: String(data.get("title")),
-      companyId: String(data.get("companyId")),
-      profileUrl: String(data.get("profileUrl") || ""),
-      seniority: "Gerência",
-      area: "Segurança",
-      solution: "API Security",
-      priority: 2,
-      role: "Influenciador",
-      lushaCreditUsed: false,
-      sentToSalesloft: false,
-    });
-    setOpen(false);
-    toast.success("Persona cadastrada manualmente");
+    try {
+      await addPersona({
+        name: String(data.get("name")),
+        title: String(data.get("title")),
+        companyId: String(data.get("companyId")),
+        profileUrl: String(data.get("profileUrl") || ""),
+        seniority: "Gerência",
+        area: "Segurança",
+        solution: "API Security",
+        priority: 2,
+        role: "Influenciador",
+        lushaCreditUsed: false,
+        sentToSalesloft: false,
+      });
+      setOpen(false);
+      toast.success("Persona cadastrada manualmente");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Falha ao salvar persona",
+      );
+    }
   }
   return (
     <>
@@ -116,8 +122,19 @@ export default function PersonasPage() {
                 type="number"
                 min="0"
                 max="300"
-                value={lushaUsed}
-                onChange={(e) => setLushaUsed(Number(e.target.value))}
+                defaultValue={lushaUsed}
+                onBlur={async (e) => {
+                  try {
+                    await setLushaUsed(Number(e.target.value));
+                    toast.success("Consumo da Lusha atualizado");
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error
+                        ? error.message
+                        : "Falha ao atualizar consumo",
+                    );
+                  }
+                }}
               />
             </label>
             {lusha.alert ? (

@@ -8,9 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 export default function LoginPage() {
   const router = useRouter();
+  const isDevelopment = process.env.NODE_ENV !== "production";
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState("demo@prospectradar.local");
-  const [password, setPassword] = useState("demo1234");
+  const [email, setEmail] = useState(
+    isDevelopment ? "demo@prospectradar.local" : "",
+  );
+  const [password, setPassword] = useState(isDevelopment ? "demo1234" : "");
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setLoading(true);
@@ -63,11 +66,13 @@ export default function LoginPage() {
               {loading ? "Entrando…" : "Entrar"}
             </Button>
           </form>
-          <div className="mt-5 rounded-lg bg-cyan-50 p-3 text-xs text-cyan-900">
-            <strong>Modo demonstração:</strong> use as credenciais preenchidas.
-            Em produção, configure o e-mail e o hash bcrypt nas variáveis de
-            ambiente.
-          </div>
+          {isDevelopment ? (
+            <div className="mt-5 rounded-lg bg-cyan-50 p-3 text-xs text-cyan-900">
+              <strong>Modo demonstração:</strong> use as credenciais
+              preenchidas. Em produção, configure o e-mail e o hash bcrypt nas
+              variáveis de ambiente.
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </main>

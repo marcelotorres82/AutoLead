@@ -107,6 +107,15 @@ export default function CompanyDetail() {
               <div className="mt-4 rounded-lg bg-cyan-50 p-4 text-sm text-cyan-950 dark:bg-cyan-950/30 dark:text-cyan-100">
                 <strong>Motivo da recomendação:</strong> {c.recommendation}
               </div>
+              {c.criteriaReason ? (
+                <div className="mt-3 rounded-lg bg-slate-50 p-4 text-sm dark:bg-slate-800">
+                  <strong>Aderência ao critério pesquisado:</strong>{" "}
+                  {c.criteriaReason}
+                  {c.criteriaConfidence !== undefined
+                    ? ` (${c.criteriaConfidence}% de confiança)`
+                    : ""}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
           <div className="grid gap-5 md:grid-cols-3">

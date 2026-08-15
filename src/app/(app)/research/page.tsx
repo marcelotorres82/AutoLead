@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { CompanyTable } from "@/components/company-table";
 import { useDemoStore } from "@/components/demo-store";
 import { PageHeading } from "@/components/page-heading";
+import { ResearchRunList } from "@/components/research-run-list";
 import { Button } from "@/components/ui/button";
 export default function ResearchPage() {
   const { generate, demoMode } = useDemoStore();
@@ -88,6 +89,9 @@ export default function ResearchPage() {
           encontrada nas fontes. Nenhum login ou dado privado é acessado.
         </p>
       </form>
+      <div className="mb-5">
+        <ResearchRunList limit={3} />
+      </div>
       <CompanyTable />
     </>
   );

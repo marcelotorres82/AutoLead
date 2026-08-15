@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enqueueResearch } from "@/lib/enqueue-research";
 import { env, demoMode } from "@/lib/env";
 import { cronAuthorized, runDailyResearch } from "@/lib/research";
 export const runtime = "nodejs";
@@ -10,6 +11,13 @@ export async function GET(request: Request) {
     timeZone: "America/Sao_Paulo",
   });
   try {
+    if (!demoMode) {
+      const run = await enqueueResearch(date, "daily");
+      return NextResponse.json(
+        { status: run.status, run },
+        { status: run.status === "completed" ? 200 : 202 },
+      );
+    }
     const result = await runDailyResearch(date, demoMode);
     return NextResponse.json(result, {
       status: result.status === "duplicate" ? 200 : 201,

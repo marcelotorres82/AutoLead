@@ -4,10 +4,17 @@ import { generateCsv } from "@/lib/csv";
 import { listCompanies } from "@/lib/company-repository";
 import { demoCompanies } from "@/lib/demo-data";
 import { demoMode } from "@/lib/env";
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await getSession()))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  const companyList = demoMode ? demoCompanies : await listCompanies();
+  const allCompanies = demoMode ? demoCompanies : await listCompanies();
+  const selectedIds = new Set(
+    new URL(request.url).searchParams.get("ids")?.split(",").slice(0, 100) ??
+      [],
+  );
+  const companyList = selectedIds.size
+    ? allCompanies.filter((company) => selectedIds.has(company.id))
+    : allCompanies;
   const csv = generateCsv(
     companyList.map((c) => ({
       nome: c.name,

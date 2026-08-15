@@ -52,6 +52,9 @@ export const companySchema = z.object({
   size: z.string(),
   employees: z.string().optional(),
   linkedinUrl: z.string().url().optional(),
+  criteriaMatch: z.enum(["compatible", "uncertain", "incompatible"]).optional(),
+  criteriaReason: z.string().optional(),
+  criteriaConfidence: z.number().int().min(0).max(100).optional(),
   description: z.string(),
   solution: z.enum(solutions),
   score: z.number().min(0).max(100),
@@ -74,6 +77,15 @@ export const companySchema = z.object({
   demo: z.boolean(),
   possibleDuplicate: z.boolean().default(false),
 });
+
+export function dateInSaoPaulo(value: Date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+}
 export type Company = z.infer<typeof companySchema>;
 
 export const analyzedEvidenceSchema = z.object({
@@ -96,6 +108,9 @@ export const analyzedCompanySchema = z.object({
   size: z.string().min(2).max(100),
   employees: z.string().max(100),
   linkedinUrl: z.string().max(2048),
+  criteriaMatch: z.enum(["compatible", "uncertain", "incompatible"]),
+  criteriaReason: z.string().min(10).max(500),
+  criteriaConfidence: z.number().int().min(0).max(100),
   description: z.string().min(20).max(800),
   solution: z.enum(solutions),
   apiScore: z.number().int().min(0).max(100),
@@ -170,6 +185,22 @@ export function verifiedLinkedInCompanyUrl(
   } catch {
     return undefined;
   }
+}
+
+export function extractEmployeeLimit(criteria?: string) {
+  if (!criteria) return undefined;
+  const match = criteria.match(
+    /(?:até|no máximo)\s+([\d.,]+)\s+funcionários?/i,
+  );
+  return match ? Number(match[1].replace(/[.,]/g, "")) : undefined;
+}
+
+export function extractEmployeeUpperBound(value?: string) {
+  if (!value) return undefined;
+  const numbers = Array.from(value.matchAll(/[\d.,]+/g), (match) =>
+    Number(match[0].replace(/[.,]/g, "")),
+  ).filter(Number.isFinite);
+  return numbers.length ? Math.max(...numbers) : undefined;
 }
 
 export function findDuplicate(

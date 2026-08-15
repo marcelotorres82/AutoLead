@@ -15,14 +15,26 @@ import { toast } from "sonner";
 import { useDemoStore } from "@/components/demo-store";
 import { PageHeading } from "@/components/page-heading";
 import { Progress } from "@/components/progress";
+import { ResearchRunList } from "@/components/research-run-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { countsTowardGoal, lushaMetrics } from "@/lib/domain";
+import { countsTowardGoal, dateInSaoPaulo, lushaMetrics } from "@/lib/domain";
 export default function Dashboard() {
   const { companies, lushaUsed, generate, demoMode } = useDemoStore();
   const [isResearching, setIsResearching] = useState(false);
-  const reviewed = companies.filter((c) => countsTowardGoal(c.status)).length;
+  const [referenceDate] = useState(() => new Date());
+  const today = dateInSaoPaulo(referenceDate);
+  const weekStart = dateInSaoPaulo(
+    new Date(referenceDate.getTime() - 6 * 86_400_000),
+  );
+  const reviewedToday = companies.filter(
+    (c) => countsTowardGoal(c.status) && c.reviewedAt === today,
+  ).length;
+  const reviewedWeek = companies.filter(
+    (c) =>
+      countsTowardGoal(c.status) && c.reviewedAt && c.reviewedAt >= weekStart,
+  ).length;
   const approved = companies.filter(
     (c) => c.status === "Aprovada para pesquisar leads",
   ).length;
@@ -99,7 +111,8 @@ export default function Dashboard() {
       ) : (
         <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
           <strong>Pesquisa pública ativa.</strong> Resultados são fundamentados
-          em fontes Tavily, analisados pela OpenAI e persistidos no Neon.
+          em fontes Tavily, analisados pelo provedor de IA configurado e
+          persistidos no Neon.
         </div>
       )}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -128,26 +141,26 @@ export default function Dashboard() {
             <div>
               <div className="mb-2 flex justify-between text-sm">
                 <span>Hoje</span>
-                <strong>{Math.min(reviewed, 30)} de 30 revisadas</strong>
+                <strong>{Math.min(reviewedToday, 30)} de 30 revisadas</strong>
               </div>
-              <Progress value={Math.min(reviewed, 30)} max={30} />
+              <Progress value={Math.min(reviewedToday, 30)} max={30} />
             </div>
             <div>
               <div className="mb-2 flex justify-between text-sm">
                 <span>Semana</span>
-                <strong>{Math.min(reviewed, 150)} de 150 avaliadas</strong>
+                <strong>{Math.min(reviewedWeek, 150)} de 150 avaliadas</strong>
               </div>
               <Progress
-                value={Math.min(reviewed, 150)}
+                value={Math.min(reviewedWeek, 150)}
                 max={150}
                 color="bg-blue-600"
               />
             </div>
-            {reviewed < 30 ? (
+            {reviewedToday < 30 ? (
               <div className="flex gap-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
                 <AlertTriangle className="size-5 shrink-0" />A meta diária ainda
-                não foi atingida. Revise {30 - Math.min(reviewed, 30)} empresas
-                para concluir.
+                não foi atingida. Revise {30 - Math.min(reviewedToday, 30)}{" "}
+                empresas para concluir.
               </div>
             ) : null}
           </CardContent>
@@ -210,18 +223,7 @@ export default function Dashboard() {
             <CardTitle>Últimas execuções</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg border p-4">
-              <div className="flex justify-between">
-                <strong className="text-sm">Pesquisa demo inicial</strong>
-                <Badge>Concluída</Badge>
-              </div>
-              <p className="mt-2 text-xs text-slate-500">
-                13 ago 2026 · 4 empresas · 0 chamadas externas · R$ 0,00
-              </p>
-            </div>
-            <div className="mt-3 rounded-lg border border-dashed p-4 text-center text-sm text-slate-500">
-              Novas execuções aparecerão aqui com duração, custos e erros.
-            </div>
+            <ResearchRunList limit={4} />
           </CardContent>
         </Card>
       </div>

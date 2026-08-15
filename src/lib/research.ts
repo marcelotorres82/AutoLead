@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { researchRuns } from "@/db/schema";
+import { researchRuns, verticals } from "@/db/schema";
 import {
   listCompanies,
   persistAnalyzedCompanies,
@@ -13,6 +13,7 @@ import { GeminiAiProvider } from "@/lib/providers/gemini";
 import { OpenAiProvider } from "@/lib/providers/openai";
 import { TavilySearchProvider } from "@/lib/providers/tavily";
 import type { SearchResult } from "@/lib/providers/types";
+import { updateResearchRunMetadata } from "@/lib/research-run-repository";
 
 const running = new Set<string>();
 
@@ -20,7 +21,10 @@ export function cronAuthorized(header: string | null, secret?: string) {
   return Boolean(secret && header === `Bearer ${secret}`);
 }
 
-export function buildSearchQueries(criteria?: string) {
+export function buildSearchQueries(
+  criteria?: string,
+  activeVerticals = verticalNames,
+) {
   const requested = criteria?.trim();
   if (requested)
     return [
@@ -30,18 +34,33 @@ export function buildSearchQueries(criteria?: string) {
       `${requested} Brasil notícias vagas expansão`,
     ];
   const year = new Date().getFullYear();
-  return verticalNames.map(
+  return activeVerticals.map(
     (vertical) =>
       `Brasil ${vertical} empresa expansão digital e-commerce aplicativo marketplace portal cliente APIs cloud infraestrutura segurança vagas ${year}`,
   );
 }
 
-function configuredAiProvider() {
+function configuredAiProviders() {
+  const providers = [];
   if (env.GEMINI_API_KEY)
-    return { provider: new GeminiAiProvider(), model: env.GEMINI_MODEL };
+    providers.push({
+      provider: new GeminiAiProvider(),
+      model: env.GEMINI_MODEL,
+    });
   if (env.OPENAI_API_KEY)
-    return { provider: new OpenAiProvider(), model: env.OPENAI_MODEL };
-  throw new Error("Nenhum provedor de IA configurado");
+    providers.push({ provider: new OpenAiProvider(), model: env.OPENAI_MODEL });
+  if (!providers.length) throw new Error("Nenhum provedor de IA configurado");
+  return providers;
+}
+
+function researchLog(
+  level: "info" | "error",
+  message: string,
+  context: Record<string, unknown>,
+) {
+  const payload = JSON.stringify({ level, message, ...context });
+  if (level === "error") console.error(payload);
+  else console.log(payload);
 }
 
 export async function runDailyResearch(
@@ -49,12 +68,14 @@ export async function runDailyResearch(
   demo = false,
   kind = "daily",
   criteria?: string,
+  runIdOverride?: string,
 ) {
-  const lockKey = `${date}:${kind}`;
+  const lockKey = runIdOverride ?? `${date}:${kind}`;
   if (running.has(lockKey))
     return { status: "duplicate" as const, date, created: 0 };
   running.add(lockKey);
   const started = Date.now();
+  let activeRunId = runIdOverride;
   try {
     if (demo)
       return {
@@ -74,13 +95,22 @@ export async function runDailyResearch(
       throw new Error("Integrações de pesquisa incompletas");
 
     const db = getDb();
-    const ai = configuredAiProvider();
-    const providerName = `tavily+${ai.provider.name}`;
-    const [existing] = await db
-      .select({ id: researchRuns.id, status: researchRuns.status })
-      .from(researchRuns)
-      .where(and(eq(researchRuns.runDate, date), eq(researchRuns.kind, kind)))
-      .limit(1);
+    const aiProviders = configuredAiProviders();
+    let selectedAi = aiProviders[0];
+    let providerName = `tavily+${selectedAi.provider.name}`;
+    const [existing] = activeRunId
+      ? await db
+          .select({ id: researchRuns.id, status: researchRuns.status })
+          .from(researchRuns)
+          .where(eq(researchRuns.id, activeRunId))
+          .limit(1)
+      : await db
+          .select({ id: researchRuns.id, status: researchRuns.status })
+          .from(researchRuns)
+          .where(
+            and(eq(researchRuns.runDate, date), eq(researchRuns.kind, kind)),
+          )
+          .limit(1);
     if (existing?.status === "completed")
       return { status: "duplicate" as const, date, created: 0 };
 
@@ -91,8 +121,9 @@ export async function runDailyResearch(
         .set({
           status: "running",
           provider: providerName,
-          model: ai.model,
+          model: selectedAi.model,
           errors: [],
+          completedAt: null,
           updatedAt: new Date(),
         })
         .where(eq(researchRuns.id, runId));
@@ -104,13 +135,35 @@ export async function runDailyResearch(
           kind,
           status: "running",
           provider: providerName,
-          model: ai.model,
+          model: selectedAi.model,
         })
         .returning({ id: researchRuns.id });
       runId = run.id;
     }
+    activeRunId = runId;
+    await updateResearchRunMetadata(runId, {
+      criteria,
+      stage: "searching",
+      progress: 20,
+    });
+    researchLog("info", "research_stage_started", {
+      runId,
+      kind,
+      stage: "searching",
+    });
 
-    const queries = buildSearchQueries(criteria);
+    const activeVerticalRows = criteria
+      ? []
+      : await db
+          .select({ name: verticals.name })
+          .from(verticals)
+          .where(eq(verticals.active, true));
+    const queries = buildSearchQueries(
+      criteria,
+      activeVerticalRows.map((item) => item.name),
+    );
+    if (!queries.length)
+      throw new Error("Nenhuma vertical de pesquisa está ativa");
     const tavily = new TavilySearchProvider();
     const searches = await Promise.allSettled(
       queries.map((query) => tavily.search(query, 8)),
@@ -134,27 +187,68 @@ export async function runDailyResearch(
     if (!uniqueResults.length)
       throw new Error("Tavily não retornou fontes públicas");
 
-    const candidates = await ai.provider.analyzeBatch(uniqueResults, criteria);
+    await updateResearchRunMetadata(runId, {
+      stage: "analyzing",
+      progress: 55,
+    });
+    let candidates;
+    const providerErrors: string[] = [];
+    for (const ai of aiProviders) {
+      try {
+        candidates = await ai.provider.analyzeBatch(uniqueResults, criteria);
+        selectedAi = ai;
+        providerName = `tavily+${ai.provider.name}`;
+        break;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        providerErrors.push(`${ai.provider.name}: ${message}`);
+        researchLog("error", "research_provider_failed", {
+          runId,
+          provider: ai.provider.name,
+          error: message,
+        });
+      }
+    }
+    if (!candidates) throw new Error(providerErrors.join(" | "));
+    await updateResearchRunMetadata(runId, {
+      stage: "persisting",
+      progress: 85,
+    });
     const persisted = await persistAnalyzedCompanies(
       candidates,
       uniqueResults,
       runId,
+      criteria,
     );
     const durationMs = Date.now() - started;
     await db
       .update(researchRuns)
       .set({
         status: "completed",
+        provider: providerName,
+        model: selectedAi.model,
         searchCount: queries.length,
         durationMs,
         foundCount: persisted.created,
         duplicateCount: persisted.duplicateCount,
-        errors,
-        metadata: criteria ? { criteria } : null,
+        errors: [...errors, ...providerErrors],
         completedAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(researchRuns.id, runId));
+    await updateResearchRunMetadata(runId, {
+      criteria,
+      stage: "completed",
+      progress: 100,
+    });
+    researchLog("info", "research_completed", {
+      runId,
+      kind,
+      durationMs,
+      created: persisted.created,
+      duplicateCount: persisted.duplicateCount,
+      provider: providerName,
+    });
     return {
       status: "completed" as const,
       date,
@@ -163,14 +257,17 @@ export async function runDailyResearch(
       durationMs,
       provider: providerName,
       estimatedCost: 0,
-      errors,
+      errors: [...errors, ...providerErrors],
       companies: await listCompanies(),
     };
   } catch (error) {
-    console.error("[research] execution failed", {
+    const message = error instanceof Error ? error.message : String(error);
+    researchLog("error", "research_failed", {
+      runId: activeRunId,
       date,
       kind,
-      error: error instanceof Error ? error.message : String(error),
+      error: message,
+      durationMs: Date.now() - started,
     });
     const db = env.DATABASE_URL ? getDb() : null;
     if (db)
@@ -179,13 +276,21 @@ export async function runDailyResearch(
         .set({
           status: "failed",
           durationMs: Date.now() - started,
-          errors: [error instanceof Error ? error.message : String(error)],
+          errors: [message],
           completedAt: new Date(),
           updatedAt: new Date(),
         })
         .where(
-          and(eq(researchRuns.runDate, date), eq(researchRuns.kind, kind)),
+          activeRunId
+            ? eq(researchRuns.id, activeRunId)
+            : and(eq(researchRuns.runDate, date), eq(researchRuns.kind, kind)),
         );
+    if (activeRunId)
+      await updateResearchRunMetadata(activeRunId, {
+        criteria,
+        stage: "failed",
+        progress: 100,
+      });
     throw error;
   } finally {
     running.delete(lockKey);

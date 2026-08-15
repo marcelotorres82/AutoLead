@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
+import { enqueueResearch } from "@/lib/enqueue-research";
 import { demoMode } from "@/lib/env";
 import { runDailyResearch } from "@/lib/research";
 import { validOrigin } from "@/lib/security";
@@ -31,6 +32,23 @@ export async function POST(request: Request) {
     day: "2-digit",
   }).format(new Date());
   try {
+    if (!demoMode) {
+      const run = await enqueueResearch(
+        date,
+        `manual-${crypto.randomUUID()}`,
+        parsed.data.query,
+      );
+      console.log(
+        JSON.stringify({
+          level: "info",
+          message: "research_enqueued",
+          route: "/api/research/manual",
+          requestId: request.headers.get("x-vercel-id"),
+          runId: run.id,
+        }),
+      );
+      return NextResponse.json({ run }, { status: 202 });
+    }
     return NextResponse.json(
       await runDailyResearch(
         date,

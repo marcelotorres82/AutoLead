@@ -14,6 +14,9 @@ import {
 } from "@/db/schema";
 import {
   calculateScore,
+  dateInSaoPaulo,
+  extractEmployeeLimit,
+  extractEmployeeUpperBound,
   findDuplicate,
   normalizeDomain,
   normalizeName,
@@ -35,6 +38,9 @@ type AnalysisMetadata = {
   titles: string[];
   navigatorQuery: string;
   tags: string[];
+  criteriaMatch?: "compatible" | "uncertain" | "incompatible";
+  criteriaReason?: string;
+  criteriaConfidence?: number;
 };
 
 const emptyBreakdown: ScoreBreakdown = {
@@ -69,6 +75,18 @@ export async function listCompanies(): Promise<Company[]> {
       .from(solutionScores)
       .where(inArray(solutionScores.companyId, ids)),
   ]);
+  const evidenceByCompany = new Map<string, typeof evidenceRows>();
+  for (const row of evidenceRows) {
+    const items = evidenceByCompany.get(row.evidence.companyId) ?? [];
+    items.push(row);
+    evidenceByCompany.set(row.evidence.companyId, items);
+  }
+  const scoresByCompany = new Map<string, Map<string, number>>();
+  for (const score of scoreRows) {
+    const values = scoresByCompany.get(score.companyId) ?? new Map();
+    values.set(score.solution, score.score);
+    scoresByCompany.set(score.companyId, values);
+  }
 
   return rows.map(({ company, vertical }) => {
     const metadata = (company.analysisMetadata ??
@@ -76,19 +94,13 @@ export async function listCompanies(): Promise<Company[]> {
     const breakdown = scoreBreakdownSchema
       .catch(emptyBreakdown)
       .parse(metadata.breakdown);
-    const companyEvidenceRows = evidenceRows.filter(
-      ({ evidence }) => evidence.companyId === company.id,
-    );
+    const companyEvidenceRows = evidenceByCompany.get(company.id) ?? [];
     const uniqueSources = Array.from(
       new Map(
         companyEvidenceRows.map(({ source }) => [source.id, source]),
       ).values(),
     );
-    const scores = new Map(
-      scoreRows
-        .filter((score) => score.companyId === company.id)
-        .map((score) => [score.solution, score.score]),
-    );
+    const scores = scoresByCompany.get(company.id) ?? new Map();
     const valuesByKind = (kind: string) =>
       companyEvidenceRows
         .filter(({ evidence }) => evidence.kind === kind)
@@ -107,6 +119,9 @@ export async function listCompanies(): Promise<Company[]> {
       size: company.size ?? "Não informado",
       employees: company.employeeRange ?? undefined,
       linkedinUrl: company.linkedinUrl ?? undefined,
+      criteriaMatch: metadata.criteriaMatch,
+      criteriaReason: metadata.criteriaReason,
+      criteriaConfidence: metadata.criteriaConfidence,
       description: company.description ?? "Sem descrição disponível.",
       solution: company.suggestedSolution ?? "WAAP",
       score: company.score,
@@ -133,8 +148,10 @@ export async function listCompanies(): Promise<Company[]> {
       status: company.status,
       tags: metadata.tags ?? [],
       notes: company.notes ?? undefined,
-      discoveredAt: company.discoveredAt.toISOString().slice(0, 10),
-      reviewedAt: company.reviewedAt?.toISOString().slice(0, 10),
+      discoveredAt: dateInSaoPaulo(company.discoveredAt),
+      reviewedAt: company.reviewedAt
+        ? dateInSaoPaulo(company.reviewedAt)
+        : undefined,
       demo: company.demo,
       possibleDuplicate: company.possibleDuplicate,
     } satisfies Company;
@@ -145,6 +162,7 @@ export async function persistAnalyzedCompanies(
   candidates: AnalyzedCompany[],
   searchResults: SearchResult[],
   runId: string,
+  criteria?: string,
 ) {
   const db = getDb();
   const [existingRows, verticalRows] = await Promise.all([
@@ -168,8 +186,17 @@ export async function persistAnalyzedCompanies(
   );
   let created = 0;
   let duplicateCount = 0;
+  const employeeLimit = extractEmployeeLimit(criteria);
 
   for (const candidate of candidates) {
+    const employeeUpperBound = extractEmployeeUpperBound(candidate.employees);
+    if (
+      (criteria && candidate.criteriaMatch === "incompatible") ||
+      (employeeLimit &&
+        employeeUpperBound &&
+        employeeUpperBound > employeeLimit)
+    )
+      continue;
     const domain = normalizeDomain(candidate.domain);
     const duplicate = findDuplicate({ name: candidate.name, domain }, known);
     if (duplicate.duplicate) {
@@ -189,6 +216,12 @@ export async function persistAnalyzedCompanies(
       titles: candidate.titles,
       navigatorQuery: candidate.navigatorQuery,
       tags: candidate.tags,
+      criteriaMatch:
+        employeeLimit && !employeeUpperBound
+          ? "uncertain"
+          : candidate.criteriaMatch,
+      criteriaReason: candidate.criteriaReason,
+      criteriaConfidence: candidate.criteriaConfidence,
     };
     const linkedinUrl = verifiedLinkedInCompanyUrl(
       candidate.linkedinUrl,

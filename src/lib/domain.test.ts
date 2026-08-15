@@ -10,6 +10,8 @@ import {
   aiBatchResultSchema,
   aiBatchAnalysisSchema,
   verifiedLinkedInCompanyUrl,
+  extractEmployeeLimit,
+  extractEmployeeUpperBound,
 } from "@/lib/domain";
 import { demoCompanies } from "@/lib/demo-data";
 describe("normalização", () => {
@@ -63,6 +65,17 @@ describe("LinkedIn", () => {
     expect(
       verifiedLinkedInCompanyUrl("https://linkedin.com/company/inventada", []),
     ).toBeUndefined();
+  });
+});
+describe("critérios de porte", () => {
+  it("extrai limite da pesquisa e teto da faixa de funcionários", () => {
+    expect(
+      extractEmployeeLimit("empresas de ecommerce com até 1.000 funcionários"),
+    ).toBe(1000);
+    expect(extractEmployeeLimit("no máximo 1,000 funcionários")).toBe(1000);
+    expect(extractEmployeeUpperBound("501–1.000 funcionários")).toBe(1000);
+    expect(extractEmployeeUpperBound("501-1,000 funcionários")).toBe(1000);
+    expect(extractEmployeeUpperBound("1.001-5.000")).toBe(5000);
   });
 });
 describe("metas", () =>
