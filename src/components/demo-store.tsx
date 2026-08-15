@@ -26,7 +26,7 @@ type Store = {
   lushaUsed: number;
   demoMode: boolean;
   updateStatus(id: string, status: CompanyStatus): Promise<void>;
-  generate(): Promise<{ created: number; provider: string }>;
+  generate(query?: string): Promise<{ created: number; provider: string }>;
   addPersona(persona: Omit<Persona, "id">): void;
   setLushaUsed(value: number): void;
 };
@@ -120,7 +120,9 @@ export function DemoStoreProvider({
           throw new Error("Não foi possível persistir o status");
         }
       },
-      async generate() {
+      async generate(
+        query = "Pesquise empresas brasileiras com forte operação digital",
+      ) {
         if (demoMode) {
           const now = Date.now();
           const generated = Array.from(
@@ -149,6 +151,8 @@ export function DemoStoreProvider({
         }
         const response = await fetch("/api/research/manual", {
           method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ query }),
         });
         const result = await response.json();
         if (!response.ok)

@@ -18,6 +18,7 @@ import {
   normalizeDomain,
   normalizeName,
   scoreBreakdownSchema,
+  verifiedLinkedInCompanyUrl,
   type AnalyzedCompany,
   type Company,
   type CompanyStatus,
@@ -105,6 +106,7 @@ export async function listCompanies(): Promise<Company[]> {
       country: company.country ?? "Brasil",
       size: company.size ?? "Não informado",
       employees: company.employeeRange ?? undefined,
+      linkedinUrl: company.linkedinUrl ?? undefined,
       description: company.description ?? "Sem descrição disponível.",
       solution: company.suggestedSolution ?? "WAAP",
       score: company.score,
@@ -188,6 +190,10 @@ export async function persistAnalyzedCompanies(
       navigatorQuery: candidate.navigatorQuery,
       tags: candidate.tags,
     };
+    const linkedinUrl = verifiedLinkedInCompanyUrl(
+      candidate.linkedinUrl,
+      resultByUrl.keys(),
+    );
     const [inserted] = await db
       .insert(companies)
       .values({
@@ -204,6 +210,7 @@ export async function persistAnalyzedCompanies(
         country: candidate.country,
         size: candidate.size,
         employeeRange: candidate.employees || null,
+        linkedinUrl: linkedinUrl ?? null,
         description: candidate.description,
         suggestedSolution: candidate.solution,
         score: calculateScore(breakdown),

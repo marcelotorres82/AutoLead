@@ -11,7 +11,10 @@ export interface WebSearchProvider {
 }
 export interface AiProvider {
   readonly name: string;
-  analyzeBatch(results: SearchResult[]): Promise<AnalyzedCompany[]>;
+  analyzeBatch(
+    results: SearchResult[],
+    criteria?: string,
+  ): Promise<AnalyzedCompany[]>;
 }
 export interface BackupStorage {
   put(path: string, body: string): Promise<{ pathname: string; size: number }>;

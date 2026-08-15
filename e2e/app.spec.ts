@@ -13,6 +13,15 @@ test("login e dashboard", async ({ page }) => {
 });
 test("pesquisa, filtros e status", async ({ page }) => {
   await page.goto("/research");
+  await expect(
+    page.getByRole("button", { name: "Pesquisar com IA" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Exportar CSV" })).toBeVisible();
+  await page
+    .getByLabel("Pesquisar novas empresas com IA")
+    .fill("Pesquise empresas de e-commerce com até 1.000 funcionários");
+  await page.getByRole("button", { name: "Pesquisar com IA" }).click();
+  await expect(page.getByText("Pesquisa demo concluída")).toBeVisible();
   await page.getByPlaceholder("Filtrar por nome ou domínio").fill("Aurora");
   await expect(page.getByText(/Aurora Mercado Digital/)).toBeVisible();
   await page.getByLabel(/Aprovar Aurora/).click();

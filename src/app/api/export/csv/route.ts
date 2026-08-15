@@ -12,6 +12,7 @@ export async function GET() {
     companyList.map((c) => ({
       nome: c.name,
       dominio: c.domain,
+      linkedin: c.linkedinUrl ?? "",
       vertical: c.vertical,
       solucao: c.solution,
       score: c.score,

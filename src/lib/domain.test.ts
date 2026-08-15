@@ -9,6 +9,7 @@ import {
   countsTowardGoal,
   aiBatchResultSchema,
   aiBatchAnalysisSchema,
+  verifiedLinkedInCompanyUrl,
 } from "@/lib/domain";
 import { demoCompanies } from "@/lib/demo-data";
 describe("normalização", () => {
@@ -49,6 +50,20 @@ describe("IA", () => {
     expect(
       JSON.stringify(zodTextFormat(aiBatchAnalysisSchema, "batch")),
     ).not.toContain('"format":"uri"'));
+});
+describe("LinkedIn", () => {
+  it("aceita somente perfil empresarial HTTPS presente nas fontes", () => {
+    const profile = "https://br.linkedin.com/company/empresa-teste";
+    expect(verifiedLinkedInCompanyUrl(profile, [profile])).toBe(profile);
+    expect(
+      verifiedLinkedInCompanyUrl("https://linkedin.com/in/pessoa", [
+        "https://linkedin.com/in/pessoa",
+      ]),
+    ).toBeUndefined();
+    expect(
+      verifiedLinkedInCompanyUrl("https://linkedin.com/company/inventada", []),
+    ).toBeUndefined();
+  });
 });
 describe("metas", () =>
   it("conta decisão humana", () => {

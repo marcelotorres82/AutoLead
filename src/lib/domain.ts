@@ -51,6 +51,7 @@ export const companySchema = z.object({
   country: z.string(),
   size: z.string(),
   employees: z.string().optional(),
+  linkedinUrl: z.string().url().optional(),
   description: z.string(),
   solution: z.enum(solutions),
   score: z.number().min(0).max(100),
@@ -94,6 +95,7 @@ export const analyzedCompanySchema = z.object({
   country: z.string().min(2).max(100),
   size: z.string().min(2).max(100),
   employees: z.string().max(100),
+  linkedinUrl: z.string().max(2048),
   description: z.string().min(20).max(800),
   solution: z.enum(solutions),
   apiScore: z.number().int().min(0).max(100),
@@ -148,6 +150,26 @@ export function normalizeName(value: string): string {
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
     .replace(/\s+/g, " ");
+}
+
+export function verifiedLinkedInCompanyUrl(
+  candidate: string,
+  sourceUrls: Iterable<string>,
+): string | undefined {
+  if (!candidate || !new Set(sourceUrls).has(candidate)) return undefined;
+  try {
+    const url = new URL(candidate);
+    const hostname = url.hostname.toLowerCase();
+    const isLinkedIn =
+      hostname === "linkedin.com" || hostname.endsWith(".linkedin.com");
+    return url.protocol === "https:" &&
+      isLinkedIn &&
+      /^\/company\/[^/]+\/?$/i.test(url.pathname)
+      ? candidate
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function findDuplicate(

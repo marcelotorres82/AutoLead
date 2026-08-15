@@ -5,6 +5,7 @@ import {
   Clipboard,
   ExternalLink,
   Lightbulb,
+  Linkedin,
   Radio,
   ShieldCheck,
 } from "lucide-react";
@@ -58,6 +59,18 @@ export default function CompanyDetail() {
           <p className="mt-1 text-sm text-slate-500">
             {c.domain} · {c.city}/{c.state} · {c.size}
           </p>
+          {c.linkedinUrl ? (
+            <a
+              className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-cyan-700 hover:underline dark:text-cyan-300"
+              href={c.linkedinUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Linkedin className="size-4" />
+              Perfil da empresa no LinkedIn
+              <ExternalLink className="size-3" />
+            </a>
+          ) : null}
         </div>
         <select
           aria-label="Alterar status"

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Check, ExternalLink, Pause, Trash2 } from "lucide-react";
+import { Check, ExternalLink, Linkedin, Pause, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useDemoStore } from "@/components/demo-store";
 import { Badge } from "@/components/ui/badge";
@@ -69,11 +69,12 @@ export function CompanyTable() {
         </label>
       </div>
       <div className="overflow-x-auto rounded-xl border bg-white dark:bg-slate-900">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-[1000px] text-left text-sm">
           <thead className="border-b bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800">
             <tr>
               <th className="p-4">Empresa</th>
               <th className="p-4">Vertical</th>
+              <th className="p-4">LinkedIn</th>
               <th className="p-4">Solução</th>
               <th className="p-4">Score</th>
               <th className="p-4">Status</th>
@@ -98,6 +99,21 @@ export function CompanyTable() {
                   </p>
                 </td>
                 <td className="p-4">{c.vertical}</td>
+                <td className="p-4">
+                  {c.linkedinUrl ? (
+                    <a
+                      className="inline-flex items-center gap-1 font-medium text-cyan-700 hover:underline dark:text-cyan-300"
+                      href={c.linkedinUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Linkedin className="size-4" />
+                      Perfil
+                    </a>
+                  ) : (
+                    <span className="text-slate-400">Não encontrado</span>
+                  )}
+                </td>
                 <td className="p-4">
                   <Badge>{c.solution}</Badge>
                 </td>

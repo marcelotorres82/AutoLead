@@ -39,6 +39,7 @@ describe("Gemini", () => {
       country: "Brasil",
       size: "Média",
       employees: "100-499",
+      linkedinUrl: "https://www.linkedin.com/company/empresa-teste",
       description: "Empresa brasileira com operação digital documentada.",
       solution: "API Security" as const,
       apiScore: 70,
@@ -93,7 +94,10 @@ describe("Gemini", () => {
       content: "Conteúdo público",
     }));
 
-    const analyzed = await new GeminiAiProvider().analyzeBatch(results);
+    const analyzed = await new GeminiAiProvider().analyzeBatch(
+      results,
+      "empresas com até 500 funcionários",
+    );
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(analyzed).toHaveLength(1);
@@ -102,5 +106,8 @@ describe("Gemini", () => {
     expect(request.generationConfig.thinkingConfig).toEqual({
       thinkingBudget: 0,
     });
+    expect(request.contents[0].parts[0].text).toContain(
+      "empresas com até 500 funcionários",
+    );
   });
 });

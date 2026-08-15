@@ -20,7 +20,15 @@ export function cronAuthorized(header: string | null, secret?: string) {
   return Boolean(secret && header === `Bearer ${secret}`);
 }
 
-function searchQueries() {
+export function buildSearchQueries(criteria?: string) {
+  const requested = criteria?.trim();
+  if (requested)
+    return [
+      `${requested} Brasil empresas`,
+      `${requested} Brasil site oficial empresa`,
+      `${requested} Brasil site:linkedin.com/company`,
+      `${requested} Brasil notícias vagas expansão`,
+    ];
   const year = new Date().getFullYear();
   return verticalNames.map(
     (vertical) =>
@@ -40,6 +48,7 @@ export async function runDailyResearch(
   date: string,
   demo = false,
   kind = "daily",
+  criteria?: string,
 ) {
   const lockKey = `${date}:${kind}`;
   if (running.has(lockKey))
@@ -101,9 +110,10 @@ export async function runDailyResearch(
       runId = run.id;
     }
 
+    const queries = buildSearchQueries(criteria);
     const tavily = new TavilySearchProvider();
     const searches = await Promise.allSettled(
-      searchQueries().map((query) => tavily.search(query, 8)),
+      queries.map((query) => tavily.search(query, 8)),
     );
     const errors = searches
       .filter(
@@ -124,7 +134,7 @@ export async function runDailyResearch(
     if (!uniqueResults.length)
       throw new Error("Tavily não retornou fontes públicas");
 
-    const candidates = await ai.provider.analyzeBatch(uniqueResults);
+    const candidates = await ai.provider.analyzeBatch(uniqueResults, criteria);
     const persisted = await persistAnalyzedCompanies(
       candidates,
       uniqueResults,
@@ -135,11 +145,12 @@ export async function runDailyResearch(
       .update(researchRuns)
       .set({
         status: "completed",
-        searchCount: searchQueries().length,
+        searchCount: queries.length,
         durationMs,
         foundCount: persisted.created,
         duplicateCount: persisted.duplicateCount,
         errors,
+        metadata: criteria ? { criteria } : null,
         completedAt: new Date(),
         updatedAt: new Date(),
       })
