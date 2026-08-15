@@ -78,7 +78,9 @@ export type Company = z.infer<typeof companySchema>;
 export const analyzedEvidenceSchema = z.object({
   kind: z.enum(["fact", "signal", "hypothesis"]),
   content: z.string().min(10).max(600),
-  sourceUrl: z.string().url(),
+  // OpenAI Structured Outputs rejects the JSON Schema `uri` format.
+  // The repository still requires an exact match with a Tavily result URL.
+  sourceUrl: z.string().min(8).max(2048),
 });
 
 export const analyzedCompanySchema = z.object({

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { zodTextFormat } from "openai/helpers/zod";
 import {
   calculateScore,
   findDuplicate,
@@ -7,6 +8,7 @@ import {
   lushaMetrics,
   countsTowardGoal,
   aiBatchResultSchema,
+  aiBatchAnalysisSchema,
 } from "@/lib/domain";
 import { demoCompanies } from "@/lib/demo-data";
 describe("normalização", () => {
@@ -38,11 +40,16 @@ describe("duplicidades", () =>
         demoCompanies,
       ).duplicate,
     ).toBe(true)));
-describe("IA", () =>
+describe("IA", () => {
   it("valida resposta estruturada", () =>
     expect(
       aiBatchResultSchema.parse({ companies: demoCompanies }).companies,
-    ).toHaveLength(4)));
+    ).toHaveLength(4));
+  it("gera schema compatível com Structured Outputs", () =>
+    expect(
+      JSON.stringify(zodTextFormat(aiBatchAnalysisSchema, "batch")),
+    ).not.toContain('"format":"uri"'));
+});
 describe("metas", () =>
   it("conta decisão humana", () => {
     expect(countsTowardGoal("Nova")).toBe(false);
