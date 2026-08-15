@@ -1,5 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { geminiResponseJsonSchema } from "@/lib/providers/gemini";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { env } from "@/lib/env";
+import {
+  GeminiAiProvider,
+  geminiResponseJsonSchema,
+} from "@/lib/providers/gemini";
+
+const originalKey = env.GEMINI_API_KEY;
+
+afterEach(() => {
+  env.GEMINI_API_KEY = originalKey;
+  vi.unstubAllGlobals();
+});
 
 describe("Gemini", () => {
   it("gera JSON Schema compatível sem metadado de draft", () => {
@@ -13,5 +24,82 @@ describe("Gemini", () => {
     expect(JSON.stringify(schema)).not.toMatch(
       /"(maxItems|maxLength|maximum|minItems|minLength|minimum|pattern)":/,
     );
+  });
+
+  it("analisa três lotes em paralelo e consolida duplicatas", async () => {
+    env.GEMINI_API_KEY = "test-key";
+    const company = {
+      name: "Empresa Teste",
+      tradeName: "Empresa Teste",
+      domain: "empresa.test",
+      vertical: "Finance",
+      subsegment: "Serviços financeiros",
+      city: "São Paulo",
+      state: "SP",
+      country: "Brasil",
+      size: "Média",
+      employees: "100-499",
+      description: "Empresa brasileira com operação digital documentada.",
+      solution: "API Security" as const,
+      apiScore: 70,
+      waapScore: 60,
+      guardicoreScore: 40,
+      breakdown: {
+        verticalFit: 15,
+        sizeComplexity: 10,
+        digitalPresence: 15,
+        transactionalChannels: 10,
+        recentSignals: 10,
+        solutionFit: 8,
+        evidenceQuality: 4,
+      },
+      recommendation:
+        "Validar os canais digitais e iniciar contato consultivo.",
+      evidence: [
+        {
+          kind: "fact" as const,
+          content: "Operação digital identificada em fonte pública.",
+          sourceUrl: "https://example.com/fonte",
+        },
+      ],
+      titles: ["CTO"],
+      navigatorQuery: "Empresa Teste CTO Brasil",
+      tags: ["digital"],
+    };
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({ companies: [company] }),
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const results = Array.from({ length: 6 }, (_, index) => ({
+      title: `Fonte ${index}`,
+      url: `https://example.com/${index}`,
+      content: "Conteúdo público",
+    }));
+
+    const analyzed = await new GeminiAiProvider().analyzeBatch(results);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(analyzed).toHaveLength(1);
+    const request = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(request.generationConfig.thinkingConfig).toEqual({
+      thinkingBudget: 0,
+    });
   });
 });

@@ -1,7 +1,11 @@
 import "server-only";
 
 import { z } from "zod";
-import { aiBatchAnalysisSchema } from "@/lib/domain";
+import {
+  aiBatchAnalysisSchema,
+  normalizeDomain,
+  normalizeName,
+} from "@/lib/domain";
 import { env } from "@/lib/env";
 import type { AiProvider, SearchResult } from "@/lib/providers/types";
 
@@ -52,13 +56,35 @@ export class GeminiAiProvider implements AiProvider {
   readonly name = "gemini";
 
   async analyzeBatch(results: SearchResult[]) {
-    if (!env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY não configurada");
+    const apiKey = env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GEMINI_API_KEY não configurada");
+    const selected = results.slice(0, 50);
+    const chunkSize = Math.ceil(selected.length / 3);
+    const chunks = Array.from({ length: 3 }, (_, index) =>
+      selected.slice(index * chunkSize, (index + 1) * chunkSize),
+    ).filter((chunk) => chunk.length > 0);
+    const batches = await Promise.all(
+      chunks.map((chunk) => this.analyzeChunk(chunk, apiKey)),
+    );
+    return Array.from(
+      new Map(
+        batches
+          .flat()
+          .map((company) => [
+            normalizeDomain(company.domain) || normalizeName(company.name),
+            company,
+          ]),
+      ).values(),
+    ).slice(0, 30);
+  }
+
+  private async analyzeChunk(results: SearchResult[], apiKey: string) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(env.GEMINI_MODEL)}:generateContent`;
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": env.GEMINI_API_KEY,
+        "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: systemInstruction }] },
@@ -67,7 +93,7 @@ export class GeminiAiProvider implements AiProvider {
             role: "user",
             parts: [
               {
-                text: `Selecione até 30 empresas inéditas e priorizáveis. Analise estas fontes públicas:\n${JSON.stringify(results.slice(0, 50))}`,
+                text: `Selecione até 10 empresas inéditas e priorizáveis. Analise estas fontes públicas:\n${JSON.stringify(results)}`,
               },
             ],
           },
@@ -76,10 +102,11 @@ export class GeminiAiProvider implements AiProvider {
           responseMimeType: "application/json",
           responseJsonSchema: geminiResponseJsonSchema(),
           temperature: 0.2,
-          maxOutputTokens: 32_768,
+          maxOutputTokens: 12_000,
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(35_000),
     });
     const raw = await response.text();
     if (!response.ok) {
