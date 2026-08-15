@@ -22,8 +22,30 @@ const systemInstruction =
 
 export function geminiResponseJsonSchema() {
   const schema = z.toJSONSchema(aiBatchAnalysisSchema, { target: "draft-7" });
-  delete (schema as Record<string, unknown>).$schema;
-  return schema;
+  const expensiveConstraints = new Set([
+    "$schema",
+    "additionalProperties",
+    "exclusiveMaximum",
+    "exclusiveMinimum",
+    "format",
+    "maxItems",
+    "maxLength",
+    "maximum",
+    "minItems",
+    "minLength",
+    "minimum",
+    "pattern",
+  ]);
+  const simplify = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(simplify);
+    if (!value || typeof value !== "object") return value;
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => !expensiveConstraints.has(key))
+        .map(([key, item]) => [key, simplify(item)]),
+    );
+  };
+  return simplify(schema);
 }
 
 export class GeminiAiProvider implements AiProvider {

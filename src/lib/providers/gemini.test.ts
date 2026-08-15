@@ -10,5 +10,8 @@ describe("Gemini", () => {
       properties: { companies: { type: "array" } },
       required: ["companies"],
     });
+    expect(JSON.stringify(schema)).not.toMatch(
+      /"(maxItems|maxLength|maximum|minItems|minLength|minimum|pattern)":/,
+    );
   });
 });
