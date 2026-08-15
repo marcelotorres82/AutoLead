@@ -9,6 +9,7 @@ import {
 } from "@/lib/company-repository";
 import { demoCompanies, verticalNames } from "@/lib/demo-data";
 import { env } from "@/lib/env";
+import { GeminiAiProvider } from "@/lib/providers/gemini";
 import { OpenAiProvider } from "@/lib/providers/openai";
 import { TavilySearchProvider } from "@/lib/providers/tavily";
 import type { SearchResult } from "@/lib/providers/types";
@@ -25,6 +26,14 @@ function searchQueries() {
     (vertical) =>
       `Brasil ${vertical} empresa expansão digital e-commerce aplicativo marketplace portal cliente APIs cloud infraestrutura segurança vagas ${year}`,
   );
+}
+
+function configuredAiProvider() {
+  if (env.GEMINI_API_KEY)
+    return { provider: new GeminiAiProvider(), model: env.GEMINI_MODEL };
+  if (env.OPENAI_API_KEY)
+    return { provider: new OpenAiProvider(), model: env.OPENAI_MODEL };
+  throw new Error("Nenhum provedor de IA configurado");
 }
 
 export async function runDailyResearch(
@@ -48,10 +57,16 @@ export async function runDailyResearch(
         estimatedCost: 0,
         companies: demoCompanies,
       };
-    if (!env.DATABASE_URL || !env.TAVILY_API_KEY || !env.OPENAI_API_KEY)
+    if (
+      !env.DATABASE_URL ||
+      !env.TAVILY_API_KEY ||
+      (!env.GEMINI_API_KEY && !env.OPENAI_API_KEY)
+    )
       throw new Error("Integrações de pesquisa incompletas");
 
     const db = getDb();
+    const ai = configuredAiProvider();
+    const providerName = `tavily+${ai.provider.name}`;
     const [existing] = await db
       .select({ id: researchRuns.id, status: researchRuns.status })
       .from(researchRuns)
@@ -64,7 +79,13 @@ export async function runDailyResearch(
     if (runId) {
       await db
         .update(researchRuns)
-        .set({ status: "running", errors: [], updatedAt: new Date() })
+        .set({
+          status: "running",
+          provider: providerName,
+          model: ai.model,
+          errors: [],
+          updatedAt: new Date(),
+        })
         .where(eq(researchRuns.id, runId));
     } else {
       const [run] = await db
@@ -73,8 +94,8 @@ export async function runDailyResearch(
           runDate: date,
           kind,
           status: "running",
-          provider: "tavily+openai",
-          model: env.OPENAI_MODEL,
+          provider: providerName,
+          model: ai.model,
         })
         .returning({ id: researchRuns.id });
       runId = run.id;
@@ -103,7 +124,7 @@ export async function runDailyResearch(
     if (!uniqueResults.length)
       throw new Error("Tavily não retornou fontes públicas");
 
-    const candidates = await new OpenAiProvider().analyzeBatch(uniqueResults);
+    const candidates = await ai.provider.analyzeBatch(uniqueResults);
     const persisted = await persistAnalyzedCompanies(
       candidates,
       uniqueResults,
@@ -129,7 +150,7 @@ export async function runDailyResearch(
       created: persisted.created,
       duplicateCount: persisted.duplicateCount,
       durationMs,
-      provider: "tavily+openai",
+      provider: providerName,
       estimatedCost: 0,
       errors,
       companies: await listCompanies(),

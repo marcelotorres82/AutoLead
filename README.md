@@ -6,7 +6,7 @@ Aplicação web single-user para pesquisar, triar e priorizar empresas antes da 
 
 - Next.js 16 (App Router), React 19, TypeScript strict, Tailwind CSS 4, componentes shadcn/ui/Radix e Lucide.
 - Neon Postgres via `@neondatabase/serverless`, Drizzle ORM/Kit e migrations versionadas.
-- Tavily para pesquisa pública e OpenAI Responses API para análise estruturada validada por Zod.
+- Tavily para pesquisa pública e Gemini (principal) ou OpenAI (fallback) para análise estruturada validada por Zod.
 - Vercel Blob privado para backups JSON; Vercel Cron para pesquisa nos dias úteis.
 - Vitest para domínio e Playwright para fluxos essenciais.
 
@@ -31,8 +31,10 @@ Abra `http://localhost:3000`. Em desenvolvimento sem autenticação configurada,
 | ----------------------- | ---------------------------------------------- |
 | `DATABASE_URL`          | String de conexão Neon (somente servidor)      |
 | `TAVILY_API_KEY`        | Busca pública                                  |
-| `OPENAI_API_KEY`        | Análise estruturada                            |
-| `OPENAI_MODEL`          | Modelo, padrão `gpt-5-mini`                    |
+| `GEMINI_API_KEY`        | Análise estruturada principal                  |
+| `GEMINI_MODEL`          | Modelo, padrão `gemini-2.5-flash`              |
+| `OPENAI_API_KEY`        | Fallback opcional para análise                 |
+| `OPENAI_MODEL`          | Modelo OpenAI, padrão `gpt-5-mini`             |
 | `CRON_SECRET`           | Segredo aleatório com pelo menos 24 caracteres |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob privado                            |
 | `AUTH_SECRET`           | Segredo de sessão com pelo menos 32 caracteres |
@@ -58,9 +60,9 @@ npm run db:seed
 
 O seed é idempotente: cadastra as oito verticais, metas 30/150, limites operacionais e o mês atual do controle Lusha.
 
-## Tavily, OpenAI e Blob
+## Tavily, Gemini, OpenAI e Blob
 
-Crie chaves nos painéis dos provedores e salve-as exclusivamente nas variáveis de servidor da Vercel. Para Blob, instale Vercel Blob no Marketplace/Storage, selecione acesso privado e conecte o store ao projeto. Nunca prefixe essas chaves com `NEXT_PUBLIC_`.
+Crie chaves nos painéis dos provedores e salve-as exclusivamente nas variáveis de servidor da Vercel. Gemini é usado primeiro; OpenAI fica como fallback opcional. Para Blob, instale Vercel Blob no Marketplace/Storage, selecione acesso privado e conecte o store ao projeto. Nunca prefixe essas chaves com `NEXT_PUBLIC_`.
 
 Sem qualquer uma das integrações principais, o banner de demonstração permanece ativo e chamadas reais são desabilitadas com orientação na tela.
 
