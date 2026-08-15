@@ -3,7 +3,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url().optional(),
   TAVILY_API_KEY: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
-  GEMINI_MODEL: z.string().default("gemini-2.5-flash-lite"),
+  GEMINI_MODEL: z.string().default("gemini-3.1-flash-lite"),
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_MODEL: z.string().default("gpt-5-mini"),
   CRON_SECRET: z.string().min(24).optional(),
