@@ -22,7 +22,47 @@ const responseSchema = z.object({
 });
 
 const systemInstruction =
-  "Você é um analista de inteligência comercial B2B. Identifique empresas brasileiras reais somente com base nas fontes fornecidas. Nunca afirme vulnerabilidades, incidentes ou exposição técnica. Separe fatos confirmados, sinais comerciais e hipóteses. Cada evidência deve apontar para uma URL exatamente presente nas fontes. Se não houver evidência suficiente, não inclua a empresa. Sugira aderência a API Security, WAAP ou Guardicore e use pontuação conservadora.";
+  "Você é um analista de inteligência comercial B2B. Identifique empresas brasileiras reais somente com base nas fontes fornecidas. Nunca afirme vulnerabilidades, incidentes ou exposição técnica. Separe fatos confirmados, sinais comerciais e hipóteses. Cada evidência deve apontar para uma URL exatamente presente nas fontes. Se não houver evidência suficiente, não inclua a empresa. Sugira aderência a API Security, WAAP ou Guardicore e use pontuação conservadora. Scores de solução vão de 0 a 100. Breakdown: verticalFit 0-20, sizeComplexity 0-15, digitalPresence 0-20, transactionalChannels 0-15, recentSignals 0-15, solutionFit 0-10 e evidenceQuality 0-5.";
+
+function normalizeGeneratedScores(value: unknown) {
+  if (!value || typeof value !== "object") return value;
+  const batch = value as Record<string, unknown>;
+  if (!Array.isArray(batch.companies)) return value;
+  const clamp = (score: unknown, maximum: number) =>
+    typeof score === "number"
+      ? Math.max(0, Math.min(maximum, Math.round(score)))
+      : score;
+  return {
+    ...batch,
+    companies: batch.companies.map((item) => {
+      if (!item || typeof item !== "object") return item;
+      const company = item as Record<string, unknown>;
+      const breakdown =
+        company.breakdown && typeof company.breakdown === "object"
+          ? (company.breakdown as Record<string, unknown>)
+          : {};
+      return {
+        ...company,
+        apiScore: clamp(company.apiScore, 100),
+        waapScore: clamp(company.waapScore, 100),
+        guardicoreScore: clamp(company.guardicoreScore, 100),
+        breakdown: {
+          ...breakdown,
+          verticalFit: clamp(breakdown.verticalFit, 20),
+          sizeComplexity: clamp(breakdown.sizeComplexity, 15),
+          digitalPresence: clamp(breakdown.digitalPresence, 20),
+          transactionalChannels: clamp(
+            breakdown.transactionalChannels,
+            15,
+          ),
+          recentSignals: clamp(breakdown.recentSignals, 15),
+          solutionFit: clamp(breakdown.solutionFit, 10),
+          evidenceQuality: clamp(breakdown.evidenceQuality, 5),
+        },
+      };
+    }),
+  };
+}
 
 export function geminiResponseJsonSchema() {
   const schema = z.toJSONSchema(aiBatchAnalysisSchema, { target: "draft-7" });
@@ -125,6 +165,8 @@ export class GeminiAiProvider implements AiProvider {
     const text = parsedResponse.candidates[0].content.parts
       .map((part) => part.text)
       .join("");
-    return aiBatchAnalysisSchema.parse(JSON.parse(text)).companies;
+    return aiBatchAnalysisSchema.parse(
+      normalizeGeneratedScores(JSON.parse(text)),
+    ).companies;
   }
 }

@@ -51,7 +51,7 @@ describe("Gemini", () => {
         transactionalChannels: 10,
         recentSignals: 10,
         solutionFit: 8,
-        evidenceQuality: 4,
+        evidenceQuality: 8,
       },
       recommendation:
         "Validar os canais digitais e iniciar contato consultivo.",
@@ -97,6 +97,7 @@ describe("Gemini", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(analyzed).toHaveLength(1);
+    expect(analyzed[0].breakdown.evidenceQuality).toBe(5);
     const request = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(request.generationConfig.thinkingConfig).toEqual({
       thinkingBudget: 0,
