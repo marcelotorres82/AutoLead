@@ -4,6 +4,26 @@ import { withWorkflow } from "workflow/next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   experimental: { serverActions: { bodySizeLimit: "1mb" } },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: "/\\.well-known/workflow/v1/flow",
+          destination: "/api/workflow-runtime/flow",
+        },
+        {
+          source: "/\\.well-known/workflow/v1/step",
+          destination: "/api/workflow-runtime/step",
+        },
+        {
+          source: "/\\.well-known/workflow/v1/webhook/:token",
+          destination: "/api/workflow-runtime/webhook/:token",
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   async headers() {
     return [
       {
