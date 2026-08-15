@@ -32,7 +32,7 @@ Abra `http://localhost:3000`. Em desenvolvimento sem autenticação configurada,
 | `DATABASE_URL`          | String de conexão Neon (somente servidor)      |
 | `TAVILY_API_KEY`        | Busca pública                                  |
 | `GEMINI_API_KEY`        | Análise estruturada principal                  |
-| `GEMINI_MODEL`          | Modelo, padrão `gemini-2.5-flash`              |
+| `GEMINI_MODEL`          | Modelo, padrão `gemini-2.5-flash-lite`         |
 | `OPENAI_API_KEY`        | Fallback opcional para análise                 |
 | `OPENAI_MODEL`          | Modelo OpenAI, padrão `gpt-5-mini`             |
 | `CRON_SECRET`           | Segredo aleatório com pelo menos 24 caracteres |
