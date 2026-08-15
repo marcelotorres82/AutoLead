@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { AppShell } from "@/components/app-shell";
 import { DemoStoreProvider } from "@/components/demo-store";
 import { listCompanies } from "@/lib/company-repository";
@@ -9,6 +10,7 @@ export default async function Layout({
 }: {
   children: React.ReactNode;
 }) {
+  await connection();
   const initialCompanies = demoMode ? demoCompanies : await listCompanies();
   return (
     <DemoStoreProvider initialCompanies={initialCompanies} demoMode={demoMode}>
