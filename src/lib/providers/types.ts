@@ -4,6 +4,13 @@ export type SearchResult = {
   url: string;
   content: string;
   publishedAt?: string;
+  provider?: string;
+};
+export type CompanyInventoryItem = {
+  name: string;
+  tradeName?: string;
+  domain: string;
+  aliases: string[];
 };
 export interface WebSearchProvider {
   readonly name: string;
@@ -14,6 +21,7 @@ export interface AiProvider {
   analyzeBatch(
     results: SearchResult[],
     criteria?: string,
+    inventory?: CompanyInventoryItem[],
   ): Promise<AnalyzedCompany[]>;
 }
 export interface BackupStorage {

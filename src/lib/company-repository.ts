@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   companies,
+  companyAliases,
   companyEvidence,
   companyStatusHistory,
   researchRunCompanies,
@@ -18,6 +19,7 @@ import {
   extractEmployeeLimit,
   extractEmployeeUpperBound,
   findDuplicate,
+  isValidVerticalClassification,
   normalizeDomain,
   normalizeName,
   scoreBreakdownSchema,
@@ -29,6 +31,7 @@ import {
 } from "@/lib/domain";
 import { env } from "@/lib/env";
 import type { SearchResult } from "@/lib/providers/types";
+import type { CompanyInventoryItem } from "@/lib/providers/types";
 
 type AnalysisMetadata = {
   apiScore: number;
@@ -41,6 +44,9 @@ type AnalysisMetadata = {
   criteriaMatch?: "compatible" | "uncertain" | "incompatible";
   criteriaReason?: string;
   criteriaConfidence?: number;
+  coreBusiness?: string;
+  classificationReason?: string;
+  classificationSourceUrl?: string;
 };
 
 const emptyBreakdown: ScoreBreakdown = {
@@ -52,6 +58,39 @@ const emptyBreakdown: ScoreBreakdown = {
   solutionFit: 0,
   evidenceQuality: 0,
 };
+
+export async function listCompanyInventory(): Promise<CompanyInventoryItem[]> {
+  const db = getDb();
+  const [companyRows, aliasRows] = await Promise.all([
+    db
+      .select({
+        id: companies.id,
+        name: companies.name,
+        tradeName: companies.tradeName,
+        domain: companies.domain,
+      })
+      .from(companies)
+      .where(isNull(companies.deletedAt)),
+    db
+      .select({
+        companyId: companyAliases.companyId,
+        alias: companyAliases.alias,
+      })
+      .from(companyAliases),
+  ]);
+  const aliasesByCompany = new Map<string, string[]>();
+  for (const row of aliasRows) {
+    const items = aliasesByCompany.get(row.companyId) ?? [];
+    items.push(row.alias);
+    aliasesByCompany.set(row.companyId, items);
+  }
+  return companyRows.map((row) => ({
+    name: row.name,
+    tradeName: row.tradeName ?? undefined,
+    domain: row.domain ?? "",
+    aliases: aliasesByCompany.get(row.id) ?? [],
+  }));
+}
 
 export async function listCompanies(): Promise<Company[]> {
   const db = getDb();
@@ -111,8 +150,11 @@ export async function listCompanies(): Promise<Company[]> {
       name: company.name,
       tradeName: company.tradeName ?? undefined,
       domain: company.domain ?? "",
-      vertical: vertical ?? "Other Media",
-      subsegment: company.subsegment ?? "Não informado",
+      vertical: vertical ?? "Não confirmado",
+      subsegment: company.subsegment ?? "Não confirmado",
+      coreBusiness: metadata.coreBusiness,
+      classificationReason: metadata.classificationReason,
+      classificationSourceUrl: metadata.classificationSourceUrl,
       city: company.city ?? "Não informado",
       state: company.state ?? "Não informado",
       country: company.country ?? "Brasil",
@@ -165,21 +207,15 @@ export async function persistAnalyzedCompanies(
   criteria?: string,
 ) {
   const db = getDb();
-  const [existingRows, verticalRows] = await Promise.all([
-    db
-      .select({
-        id: companies.id,
-        name: companies.name,
-        domain: companies.domain,
-      })
-      .from(companies)
-      .where(isNull(companies.deletedAt)),
+  const [inventory, verticalRows] = await Promise.all([
+    listCompanyInventory(),
     db.select({ id: verticals.id, name: verticals.name }).from(verticals),
   ]);
-  const known = existingRows.map((row) => ({
-    name: row.name,
-    domain: row.domain ?? "",
-  }));
+  const known = inventory.flatMap((item) =>
+    [item.name, item.tradeName, ...item.aliases]
+      .filter((name): name is string => Boolean(name))
+      .map((name) => ({ name, domain: item.domain })),
+  );
   const verticalMap = new Map(verticalRows.map((row) => [row.name, row.id]));
   const resultByUrl = new Map(
     searchResults.map((result) => [result.url, result]),
@@ -197,6 +233,14 @@ export async function persistAnalyzedCompanies(
         employeeUpperBound > employeeLimit)
     )
       continue;
+    if (
+      !isValidVerticalClassification(
+        candidate.vertical,
+        candidate.subsegment,
+      ) ||
+      !verticalMap.has(candidate.vertical)
+    )
+      continue;
     const domain = normalizeDomain(candidate.domain);
     const duplicate = findDuplicate({ name: candidate.name, domain }, known);
     if (duplicate.duplicate) {
@@ -206,7 +250,12 @@ export async function persistAnalyzedCompanies(
     const validEvidence = candidate.evidence.filter((item) =>
       resultByUrl.has(item.sourceUrl),
     );
-    if (!domain || !validEvidence.length) continue;
+    if (
+      !domain ||
+      !validEvidence.length ||
+      !resultByUrl.has(candidate.classificationSourceUrl)
+    )
+      continue;
     const breakdown = scoreBreakdownSchema.parse(candidate.breakdown);
     const metadata: AnalysisMetadata = {
       apiScore: candidate.apiScore,
@@ -222,6 +271,9 @@ export async function persistAnalyzedCompanies(
           : candidate.criteriaMatch,
       criteriaReason: candidate.criteriaReason,
       criteriaConfidence: candidate.criteriaConfidence,
+      coreBusiness: candidate.coreBusiness,
+      classificationReason: candidate.classificationReason,
+      classificationSourceUrl: candidate.classificationSourceUrl,
     };
     const linkedinUrl = verifiedLinkedInCompanyUrl(
       candidate.linkedinUrl,
@@ -235,8 +287,7 @@ export async function persistAnalyzedCompanies(
         normalizedName: normalizeName(candidate.name),
         domain,
         normalizedDomain: domain,
-        verticalId:
-          verticalMap.get(candidate.vertical) ?? verticalMap.get("Other Media"),
+        verticalId: verticalMap.get(candidate.vertical),
         subsegment: candidate.subsegment,
         city: candidate.city || null,
         state: candidate.state || null,
@@ -256,6 +307,19 @@ export async function persistAnalyzedCompanies(
       })
       .returning({ id: companies.id });
     if (!inserted) continue;
+
+    const aliases = [candidate.tradeName]
+      .filter(
+        (alias) =>
+          alias && normalizeName(alias) !== normalizeName(candidate.name),
+      )
+      .map((alias) => ({
+        companyId: inserted.id,
+        alias,
+        normalizedAlias: normalizeName(alias),
+      }));
+    if (aliases.length)
+      await db.insert(companyAliases).values(aliases).onConflictDoNothing();
 
     await db.insert(solutionScores).values([
       {
@@ -289,7 +353,7 @@ export async function persistAnalyzedCompanies(
           publishedAt: search.publishedAt ? new Date(search.publishedAt) : null,
           accessedAt: new Date(),
           summary: search.content.slice(0, 1500),
-          rawMetadata: { provider: "tavily" },
+          rawMetadata: { provider: search.provider ?? "unknown" },
         })
         .onConflictDoNothing({ target: sources.url })
         .returning();

@@ -7,7 +7,12 @@ import {
   normalizeName,
 } from "@/lib/domain";
 import { env } from "@/lib/env";
-import type { AiProvider, SearchResult } from "@/lib/providers/types";
+import type {
+  AiProvider,
+  CompanyInventoryItem,
+  SearchResult,
+} from "@/lib/providers/types";
+import { researchSystemInstruction } from "@/lib/research-prompt";
 
 const responseSchema = z.object({
   candidates: z
@@ -20,9 +25,6 @@ const responseSchema = z.object({
     )
     .min(1),
 });
-
-const systemInstruction =
-  "Você é um analista de inteligência comercial B2B. Identifique empresas brasileiras reais somente com base nas fontes fornecidas. Nunca afirme vulnerabilidades, incidentes ou exposição técnica. Separe fatos confirmados, sinais comerciais e hipóteses. Cada evidência deve apontar para uma URL exatamente presente nas fontes. Se não houver evidência suficiente, não inclua a empresa. Sugira aderência a API Security, WAAP ou Guardicore e use pontuação conservadora. Scores de solução vão de 0 a 100. Breakdown: verticalFit 0-20, sizeComplexity 0-15, digitalPresence 0-20, transactionalChannels 0-15, recentSignals 0-15, solutionFit 0-10 e evidenceQuality 0-5. O campo linkedinUrl deve conter somente uma URL HTTPS de perfil empresarial /company/ exatamente presente nas fontes; use string vazia quando não houver. Nunca invente uma URL do LinkedIn. Preencha criteriaMatch, criteriaReason e criteriaConfidence usando apenas evidências das fontes; marque uncertain quando porte ou outro critério não puder ser confirmado.";
 
 function criteriaInstruction(criteria?: string) {
   return criteria
@@ -98,7 +100,11 @@ export function geminiResponseJsonSchema() {
 export class GeminiAiProvider implements AiProvider {
   readonly name = "gemini";
 
-  async analyzeBatch(results: SearchResult[], criteria?: string) {
+  async analyzeBatch(
+    results: SearchResult[],
+    criteria?: string,
+    inventory: CompanyInventoryItem[] = [],
+  ) {
     const apiKey = env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY não configurada");
     const selected = results.slice(0, 50);
@@ -107,7 +113,9 @@ export class GeminiAiProvider implements AiProvider {
       selected.slice(index * chunkSize, (index + 1) * chunkSize),
     ).filter((chunk) => chunk.length > 0);
     const batches = await Promise.all(
-      chunks.map((chunk) => this.analyzeChunk(chunk, apiKey, criteria)),
+      chunks.map((chunk) =>
+        this.analyzeChunk(chunk, apiKey, criteria, inventory),
+      ),
     );
     return Array.from(
       new Map(
@@ -125,6 +133,7 @@ export class GeminiAiProvider implements AiProvider {
     results: SearchResult[],
     apiKey: string,
     criteria?: string,
+    inventory: CompanyInventoryItem[] = [],
   ) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(env.GEMINI_MODEL)}:generateContent`;
     const response = await fetch(endpoint, {
@@ -134,13 +143,13 @@ export class GeminiAiProvider implements AiProvider {
         "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemInstruction }] },
+        systemInstruction: { parts: [{ text: researchSystemInstruction() }] },
         contents: [
           {
             role: "user",
             parts: [
               {
-                text: `Selecione até 10 empresas inéditas e priorizáveis.${criteriaInstruction(criteria)} Analise estas fontes públicas:\n${JSON.stringify(results)}`,
+                text: `Selecione até 10 empresas inéditas e priorizáveis.${criteriaInstruction(criteria)} Não inclua nenhuma conta deste inventário, considerando também marcas, aliases e domínios: ${JSON.stringify(inventory)}. Analise estas fontes públicas:\n${JSON.stringify(results)}`,
               },
             ],
           },

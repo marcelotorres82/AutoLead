@@ -7,6 +7,7 @@ Aplicação web single-user para pesquisar, triar e priorizar empresas antes da 
 - Next.js 16 (App Router), React 19, TypeScript strict, Tailwind CSS 4, componentes shadcn/ui/Radix e Lucide.
 - Neon Postgres via `@neondatabase/serverless`, Drizzle ORM/Kit e migrations versionadas.
 - Tavily para pesquisa pública e Gemini (principal) ou OpenAI (fallback) para análise estruturada validada por Zod.
+- Taxonomia fechada de nove verticais e suas subverticais, classificada pelo core business com fonte e justificativa obrigatórias.
 - Vercel Blob privado para backups JSON; Vercel Cron para pesquisa nos dias úteis.
 - Vitest para domínio e Playwright para fluxos essenciais.
 
@@ -58,7 +59,7 @@ npm run db:migrate
 npm run db:seed
 ```
 
-O seed é idempotente: cadastra as oito verticais, metas 30/150, limites operacionais e o mês atual do controle Lusha.
+O seed é idempotente: cadastra as nove verticais e suas subverticais oficiais, metas 30/150, limites operacionais e o mês atual do controle Lusha. Rode-o novamente após atualizar uma instalação existente para incluir `Video Media` e atualizar as descrições da taxonomia.
 
 ## Tavily, Gemini, OpenAI e Blob
 
@@ -69,6 +70,10 @@ Sem qualquer uma das integrações principais, o banner de demonstração perman
 ## Pesquisa diária e Cron
 
 `vercel.json` agenda `GET /api/cron/daily-research` com `0 10 * * 1-5`. Cron usa UTC: 10:00 UTC corresponde a 07:00 em Brasília quando UTC-3. O endpoint exige `Authorization: Bearer ${CRON_SECRET}` e usa data de Brasília como chave de idempotência. A estratégia prevista é busca ampla por vertical, normalização/deduplicação, análise em lote e enriquecimento sob demanda — não 30 análises profundas dentro da mesma função.
+
+A classificação considera a principal fonte de receita ou missão institucional. Canal digital, e-commerce, aplicativo ou portal secundário não altera a vertical. A persistência rejeita pares vertical/subvertical fora da taxonomia e exige uma fonte retornada pela busca para comprovar o core business; não há fallback automático para `Other Media`.
+
+Antes de analisar as fontes, o fluxo envia à IA o inventário de nomes, nomes fantasia, aliases e domínios já persistidos. Os resultados das consultas são intercalados por posição, normalizados por URL e limitados por domínio antes do corte de contexto, evitando que as primeiras verticais ou um único portal ocupem toda a análise.
 
 Teste manualmente:
 

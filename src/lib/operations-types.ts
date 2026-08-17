@@ -19,4 +19,5 @@ export type VerticalView = {
   name: string;
   description?: string;
   active: boolean;
+  subverticals: readonly string[];
 };

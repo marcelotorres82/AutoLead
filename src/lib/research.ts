@@ -4,10 +4,12 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { researchRuns, verticals } from "@/db/schema";
 import {
+  listCompanyInventory,
   listCompanies,
   persistAnalyzedCompanies,
 } from "@/lib/company-repository";
-import { demoCompanies, verticalNames } from "@/lib/demo-data";
+import { demoCompanies } from "@/lib/demo-data";
+import { verticalNames, verticalTaxonomy } from "@/lib/domain";
 import { env } from "@/lib/env";
 import { GeminiAiProvider } from "@/lib/providers/gemini";
 import { OpenAiProvider } from "@/lib/providers/openai";
@@ -23,7 +25,7 @@ export function cronAuthorized(header: string | null, secret?: string) {
 
 export function buildSearchQueries(
   criteria?: string,
-  activeVerticals = verticalNames,
+  activeVerticals: readonly string[] = verticalNames,
 ) {
   const requested = criteria?.trim();
   if (requested)
@@ -34,10 +36,51 @@ export function buildSearchQueries(
       `${requested} Brasil notícias vagas expansão`,
     ];
   const year = new Date().getFullYear();
-  return activeVerticals.map(
-    (vertical) =>
-      `Brasil ${vertical} empresa expansão digital e-commerce aplicativo marketplace portal cliente APIs cloud infraestrutura segurança vagas ${year}`,
+  return activeVerticals.map((vertical) => {
+    const subverticals =
+      vertical in verticalTaxonomy
+        ? verticalTaxonomy[vertical as keyof typeof verticalTaxonomy].join(
+            " OR ",
+          )
+        : "";
+    return `Brasil ${vertical}${subverticals ? ` (${subverticals})` : ""} empresas core business site oficial expansão digital APIs cloud infraestrutura segurança vagas ${year}`;
+  });
+}
+
+export function mergeSearchResults(
+  resultGroups: SearchResult[][],
+  limit = 50,
+  perDomainLimit = 4,
+) {
+  const merged: SearchResult[] = [];
+  const seenUrls = new Set<string>();
+  const domainCounts = new Map<string, number>();
+  const maxGroupSize = Math.max(
+    0,
+    ...resultGroups.map((group) => group.length),
   );
+  for (let rank = 0; rank < maxGroupSize && merged.length < limit; rank += 1) {
+    for (const group of resultGroups) {
+      const result = group[rank];
+      if (!result) continue;
+      const url = new URL(result.url);
+      url.hash = "";
+      url.search = "";
+      url.pathname = url.pathname.replace(/\/$/, "") || "/";
+      const canonicalUrl = url.toString();
+      const domain = url.hostname.replace(/^www\./, "");
+      if (
+        seenUrls.has(canonicalUrl) ||
+        (domainCounts.get(domain) ?? 0) >= perDomainLimit
+      )
+        continue;
+      seenUrls.add(canonicalUrl);
+      domainCounts.set(domain, (domainCounts.get(domain) ?? 0) + 1);
+      merged.push(result);
+      if (merged.length >= limit) break;
+    }
+  }
+  return merged;
 }
 
 function configuredAiProviders() {
@@ -166,24 +209,21 @@ export async function runDailyResearch(
       throw new Error("Nenhuma vertical de pesquisa está ativa");
     const tavily = new TavilySearchProvider();
     const searches = await Promise.allSettled(
-      queries.map((query) => tavily.search(query, 8)),
+      queries.map((query) => tavily.search(query, 12)),
     );
     const errors = searches
       .filter(
         (item): item is PromiseRejectedResult => item.status === "rejected",
       )
       .map((item) => String(item.reason));
-    const uniqueResults = Array.from(
-      new Map(
-        searches
-          .filter(
-            (item): item is PromiseFulfilledResult<SearchResult[]> =>
-              item.status === "fulfilled",
-          )
-          .flatMap((item) => item.value)
-          .map((item) => [item.url, item]),
-      ).values(),
-    ).slice(0, 50);
+    const uniqueResults = mergeSearchResults(
+      searches
+        .filter(
+          (item): item is PromiseFulfilledResult<SearchResult[]> =>
+            item.status === "fulfilled",
+        )
+        .map((item) => item.value),
+    );
     if (!uniqueResults.length)
       throw new Error("Tavily não retornou fontes públicas");
 
@@ -193,9 +233,14 @@ export async function runDailyResearch(
     });
     let candidates;
     const providerErrors: string[] = [];
+    const inventory = await listCompanyInventory();
     for (const ai of aiProviders) {
       try {
-        candidates = await ai.provider.analyzeBatch(uniqueResults, criteria);
+        candidates = await ai.provider.analyzeBatch(
+          uniqueResults,
+          criteria,
+          inventory,
+        );
         selectedAi = ai;
         providerName = `tavily+${ai.provider.name}`;
         break;

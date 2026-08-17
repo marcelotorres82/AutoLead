@@ -29,6 +29,8 @@ export class TavilySearchProvider implements WebSearchProvider {
           query,
           max_results: Math.min(limit, 20),
           search_depth: "advanced",
+          chunks_per_source: 3,
+          country: "brazil",
         }),
         signal: controller.signal,
       });
@@ -40,6 +42,7 @@ export class TavilySearchProvider implements WebSearchProvider {
           url: assertSafePublicUrl(item.url).toString(),
           content: item.content,
           publishedAt: item.published_date ?? undefined,
+          provider: this.name,
         }));
     } finally {
       clearTimeout(timer);

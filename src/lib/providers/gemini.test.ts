@@ -32,8 +32,13 @@ describe("Gemini", () => {
       name: "Empresa Teste",
       tradeName: "Empresa Teste",
       domain: "empresa.test",
-      vertical: "Finance",
-      subsegment: "Serviços financeiros",
+      vertical: "Business Services",
+      subsegment: "Consultoria e serviços de TI",
+      coreBusiness:
+        "Prestação de consultoria e serviços de tecnologia para empresas.",
+      classificationReason:
+        "A descrição institucional apresenta serviços de TI como atividade principal.",
+      classificationSourceUrl: "https://example.com/fonte",
       city: "São Paulo",
       state: "SP",
       country: "Brasil",

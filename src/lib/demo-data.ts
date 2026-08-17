@@ -1,4 +1,4 @@
-import type { Company } from "@/lib/domain";
+import { verticalNames, type Company } from "@/lib/domain";
 
 const accessedAt = "2026-08-13";
 const makeSource = (id: string, title: string) => ({
@@ -17,7 +17,7 @@ export const demoCompanies: Company[] = [
     tradeName: "Aurora",
     domain: "aurora-demo.example",
     vertical: "Retail",
-    subsegment: "Marketplace fictício",
+    subsegment: "Varejo e e-commerce",
     city: "São Paulo",
     state: "SP",
     country: "Brasil",
@@ -70,7 +70,7 @@ export const demoCompanies: Company[] = [
     name: "Atlas Serviços Integrados (Demonstração)",
     domain: "atlas-servicos-demo.example",
     vertical: "Business Services",
-    subsegment: "Logística fictícia",
+    subsegment: "Logística",
     city: "Campinas",
     state: "SP",
     country: "Brasil",
@@ -121,7 +121,7 @@ export const demoCompanies: Company[] = [
     name: "Instituto Horizonte Educação (Demonstração)",
     domain: "horizonte-edu-demo.example",
     vertical: "Education",
-    subsegment: "Ensino superior fictício",
+    subsegment: "Universidades",
     city: "Curitiba",
     state: "PR",
     country: "Brasil",
@@ -172,7 +172,7 @@ export const demoCompanies: Company[] = [
     name: "Fundação Verde Amanhã (Demonstração)",
     domain: "verde-amanha-demo.example",
     vertical: "Non-Profit",
-    subsegment: "Fundação fictícia",
+    subsegment: "Organizações sem fins lucrativos",
     city: "Recife",
     state: "PE",
     country: "Brasil",
@@ -210,13 +210,4 @@ export const demoCompanies: Company[] = [
   },
 ];
 
-export const verticalNames = [
-  "Retail",
-  "Business Services",
-  "State, Regional and Local",
-  "Federal and Central",
-  "Education",
-  "Hospitality",
-  "Non-Profit",
-  "Other Media",
-];
+export { verticalNames };

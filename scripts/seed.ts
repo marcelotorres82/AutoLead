@@ -1,15 +1,24 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { verticals, settings, lushaUsage } from "../src/db/schema";
-import { verticalNames } from "../src/lib/demo-data";
+import { verticalNames, verticalTaxonomy } from "../src/lib/domain";
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL é obrigatória para o seed");
 const db = drizzle(neon(url));
 for (const name of verticalNames)
   await db
     .insert(verticals)
-    .values({ name, description: `Vertical inicial: ${name}` })
-    .onConflictDoNothing();
+    .values({
+      name,
+      description: verticalTaxonomy[name].join(" · "),
+    })
+    .onConflictDoUpdate({
+      target: verticals.name,
+      set: {
+        description: verticalTaxonomy[name].join(" · "),
+        updatedAt: new Date(),
+      },
+    });
 await db
   .insert(settings)
   .values([

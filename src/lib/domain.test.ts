@@ -12,6 +12,8 @@ import {
   verifiedLinkedInCompanyUrl,
   extractEmployeeLimit,
   extractEmployeeUpperBound,
+  isValidVerticalClassification,
+  verticalNames,
 } from "@/lib/domain";
 import { demoCompanies } from "@/lib/demo-data";
 describe("normalização", () => {
@@ -52,6 +54,22 @@ describe("IA", () => {
     expect(
       JSON.stringify(zodTextFormat(aiBatchAnalysisSchema, "batch")),
     ).not.toContain('"format":"uri"'));
+});
+describe("taxonomia comercial", () => {
+  it("mantém as nove verticais configuradas", () => {
+    expect(verticalNames).toHaveLength(9);
+    expect(verticalNames).toContain("Video Media");
+  });
+
+  it("aceita somente pares exatos de vertical e subvertical", () => {
+    expect(isValidVerticalClassification("Retail", "Varejo e e-commerce")).toBe(
+      true,
+    );
+    expect(isValidVerticalClassification("Retail", "Logística")).toBe(false);
+    expect(isValidVerticalClassification("Healthcare", "Diagnósticos")).toBe(
+      false,
+    );
+  });
 });
 describe("LinkedIn", () => {
   it("aceita somente perfil empresarial HTTPS presente nas fontes", () => {

@@ -190,7 +190,10 @@ export function CompanyTable() {
                     </p>
                   ) : null}
                 </td>
-                <td className="p-4">{c.vertical}</td>
+                <td className="p-4">
+                  <span>{c.vertical}</span>
+                  <p className="mt-1 text-xs text-slate-500">{c.subsegment}</p>
+                </td>
                 <td className="p-4">
                   {c.linkedinUrl ? (
                     <a

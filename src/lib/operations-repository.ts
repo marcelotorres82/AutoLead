@@ -4,6 +4,7 @@ import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { lushaUsage, personas, verticals } from "@/db/schema";
 import type { Persona, VerticalView } from "@/lib/operations-types";
+import { verticalTaxonomy } from "@/lib/domain";
 
 export async function listPersonas(): Promise<Persona[]> {
   const rows = await getDb()
@@ -90,6 +91,10 @@ export async function listVerticals(): Promise<VerticalView[]> {
     id: row.id,
     name: row.name,
     description: row.description ?? undefined,
+    subverticals:
+      row.name in verticalTaxonomy
+        ? verticalTaxonomy[row.name as keyof typeof verticalTaxonomy]
+        : [],
     active: row.active,
   }));
 }
