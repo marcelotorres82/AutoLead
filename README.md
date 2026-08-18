@@ -67,6 +67,14 @@ Crie chaves nos painéis dos provedores e salve-as exclusivamente nas variáveis
 
 Sem qualquer uma das integrações principais, o banner de demonstração permanece ativo e chamadas reais são desabilitadas com orientação na tela.
 
+## Pesquisa de leads nas empresas aprovadas
+
+Depois de mudar uma empresa para `Aprovada para pesquisar leads`, selecione até cinco contas na tabela e use **Leads**. Cada empresa inicia um workflow independente com quatro consultas Tavily complementares: cargos e liderança, perfis públicos indexados do LinkedIn, página institucional da equipe e movimentações profissionais recentes. O limite por lote contém o consumo da franquia já configurada; nenhum provedor pago adicional é necessário.
+
+O fluxo não acessa uma sessão do LinkedIn, não automatiza Sales Navigator e não coleta e-mail ou telefone. A IA só pode criar candidatos apoiados por URLs retornadas na pesquisa, limita a confiança quando o vínculo é provável ou incerto e salva tudo como `Pendente de validação`. Na tela Personas, confirme cargo e empresa atual manualmente — idealmente no Sales Navigator —, aprove ou descarte e somente então consulte o Lusha manualmente quando fizer sentido.
+
+Resultados repetidos são comparados por URL de perfil ou pela combinação nome + cargo dentro da mesma empresa. Assim, uma nova pesquisa reaproveita o histórico sem eliminar homônimos que ocupem funções diferentes.
+
 ## Pesquisa diária e Cron
 
 `vercel.json` agenda `GET /api/cron/daily-research` com `0 10 * * 1-5`. Cron usa UTC: 10:00 UTC corresponde a 07:00 em Brasília quando UTC-3. O endpoint exige `Authorization: Bearer ${CRON_SECRET}` e usa data de Brasília como chave de idempotência. A estratégia prevista é busca ampla por vertical, normalização/deduplicação, análise em lote e enriquecimento sob demanda — não 30 análises profundas dentro da mesma função.
@@ -94,7 +102,7 @@ Confira no plano Vercel escolhido a disponibilidade e precisão do Cron e o limi
 
 Sessões são JWT assinadas em cookie HTTP-only, `sameSite=lax` e `secure` em produção. Login possui rate limit em memória (troque por store compartilhado em escala horizontal), verificação de origem e bcrypt custo 12. CSP e headers de segurança são configurados em `next.config.ts`. Adaptadores externos têm timeout, validação Zod e bloqueio básico de SSRF/protocolos/IPs privados. Não são registrados segredos, sessões ou cabeçalhos sensíveis.
 
-Não faça scraping/login/navegação automática no LinkedIn, não solicite credenciais corporativas e não use a aplicação para port scanning, pentest ou alegações de vulnerabilidade. URLs de perfil e estados de Salesforce/Lusha/SalesLoft são campos manuais e pessoais, sem sincronização.
+Não faça scraping/login/navegação automática no LinkedIn, não solicite credenciais corporativas e não use a aplicação para port scanning, pentest ou alegações de vulnerabilidade. A pesquisa de pessoas aceita apenas URLs públicas já indexadas pelo Tavily; a validação em Sales Navigator e o uso de Lusha continuam manuais, sem sincronização.
 
 ## Qualidade
 

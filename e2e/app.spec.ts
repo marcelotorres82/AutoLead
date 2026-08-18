@@ -38,6 +38,29 @@ test("cadastro persona", async ({ page }) => {
   await page.getByRole("button", { name: "Salvar persona" }).click();
   await expect(page.getByText("Pessoa Teste")).toBeVisible();
 });
+test("pesquisa e revisão de leads sem consumir integrações", async ({
+  page,
+}) => {
+  await page.goto("/companies");
+  await page
+    .getByLabel("Selecionar Instituto Horizonte Educação (Demonstração)")
+    .check();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Leads" }).click();
+  await expect(page.getByText("1 pesquisa de leads iniciada")).toBeVisible();
+
+  await page.goto("/personas");
+  await expect(page.getByText("Decisor Exemplo 1")).toBeVisible();
+  const candidate = page
+    .getByRole("article")
+    .filter({ hasText: "Decisor Exemplo 1" });
+  await expect(candidate.getByText("Pendente de validação")).toBeVisible();
+  await candidate.getByRole("button", { name: "Aprovar" }).click();
+  await expect(candidate.getByText("Aprovado")).toBeVisible();
+  await expect(
+    page.getByText(/Use créditos somente depois de validar a pessoa/),
+  ).toBeVisible();
+});
 test("exportação autenticada", async ({ request, page }) => {
   const cookies = await page.context().cookies();
   const response = await request.get("/api/export/csv", {

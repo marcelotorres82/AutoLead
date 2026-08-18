@@ -1,4 +1,5 @@
 import type { AnalyzedCompany } from "@/lib/domain";
+import type { AnalyzedLead, LeadResearchContext } from "@/lib/lead-domain";
 export type SearchResult = {
   title: string;
   url: string;
@@ -23,6 +24,11 @@ export interface AiProvider {
     criteria?: string,
     inventory?: CompanyInventoryItem[],
   ): Promise<AnalyzedCompany[]>;
+  analyzeLeads(
+    results: SearchResult[],
+    context: LeadResearchContext,
+    existing: Array<{ name: string; profileUrl: string | null }>,
+  ): Promise<AnalyzedLead[]>;
 }
 export interface BackupStorage {
   put(path: string, body: string): Promise<{ pathname: string; size: number }>;
