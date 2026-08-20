@@ -7,8 +7,11 @@ import { Badge } from "@/components/ui/badge";
 const stageLabels: Record<string, string> = {
   queued: "Na fila",
   searching: "Buscando fontes",
+  searching_leads: "Buscando pessoas",
   analyzing: "Analisando com IA",
+  analyzing_leads: "Analisando pessoas",
   persisting: "Salvando empresas",
+  persisting_leads: "Salvando candidatos",
   completed: "Concluída",
   failed: "Falhou",
 };
@@ -37,10 +40,12 @@ export function ResearchRunList({ limit = 10 }: { limit?: number }) {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">
-                  {run.criteria ??
-                    (run.kind === "daily"
-                      ? "Pesquisa diária"
-                      : "Pesquisa manual")}
+                  {run.researchType === "leads"
+                    ? `Leads · ${run.companyName ?? "empresa"}`
+                    : (run.criteria ??
+                      (run.kind === "daily"
+                        ? "Pesquisa diária"
+                        : "Pesquisa manual"))}
                 </p>
                 <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
                   <Clock3 className="size-3" />
@@ -64,8 +69,11 @@ export function ResearchRunList({ limit = 10 }: { limit?: number }) {
               />
             </div>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-              <span>{run.foundCount} novas</span>
-              <span>{run.duplicateCount} duplicadas</span>
+              <span>
+                {run.foundCount}{" "}
+                {run.researchType === "leads" ? "candidatos" : "novas"}
+              </span>
+              <span>{run.duplicateCount} repetidos</span>
               {run.durationMs ? (
                 <span>{(run.durationMs / 1000).toFixed(1)}s</span>
               ) : null}

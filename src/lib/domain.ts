@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { companySignalsSchema } from "@/lib/company-signals";
 
 export const companyStatuses = [
   "Nova",
@@ -17,6 +18,65 @@ export const companyStatuses = [
 export type CompanyStatus = (typeof companyStatuses)[number];
 export const solutions = ["API Security", "WAAP", "Guardicore"] as const;
 export type Solution = (typeof solutions)[number];
+
+export const verticalTaxonomy = {
+  "Business Services": [
+    "Agências de publicidade e marketing",
+    "Consultoria e serviços de TI",
+    "Logística",
+  ],
+  Education: [
+    "Ensino básico/K-12",
+    "Universidades",
+    "Treinamento técnico e profissional",
+  ],
+  "Federal and Central": [
+    "Defesa e inteligência",
+    "Setor civil federal/central",
+  ],
+  Hospitality: ["Hotelaria e turismo"],
+  "Non-Profit": ["Organizações sem fins lucrativos", "Assistência social"],
+  "Other Media": [
+    "AdTech",
+    "Música e filmes",
+    "Portais e buscadores",
+    "Editoras",
+    "Times e ligas esportivas",
+  ],
+  Retail: ["Varejo e e-commerce"],
+  "State, Regional and Local": ["Setor público estadual, regional e local"],
+  "Video Media": ["Workflow de vídeo e OVP", "Transmissão/broadcast", "OTT"],
+} as const;
+
+export const verticalNames = Object.keys(verticalTaxonomy) as [
+  keyof typeof verticalTaxonomy,
+  ...(keyof typeof verticalTaxonomy)[],
+];
+export type Vertical = (typeof verticalNames)[number];
+
+export const subverticalNames = Object.values(verticalTaxonomy).flat() as [
+  (typeof verticalTaxonomy)[Vertical][number],
+  ...(typeof verticalTaxonomy)[Vertical][number][],
+];
+export type Subvertical = (typeof subverticalNames)[number];
+
+export function isValidVerticalClassification(
+  vertical: string,
+  subvertical: string,
+): vertical is Vertical {
+  if (!(vertical in verticalTaxonomy)) return false;
+  return (verticalTaxonomy[vertical as Vertical] as readonly string[]).includes(
+    subvertical,
+  );
+}
+
+export function verticalTaxonomyPrompt() {
+  return Object.entries(verticalTaxonomy)
+    .map(
+      ([vertical, subverticals]) => `${vertical}: ${subverticals.join("; ")}`,
+    )
+    .join("\n");
+}
 
 export const scoreBreakdownSchema = z.object({
   verticalFit: z.number().min(0).max(20),
@@ -46,6 +106,9 @@ export const companySchema = z.object({
   domain: z.string(),
   vertical: z.string(),
   subsegment: z.string(),
+  coreBusiness: z.string().optional(),
+  classificationReason: z.string().optional(),
+  classificationSourceUrl: z.string().url().optional(),
   city: z.string(),
   state: z.string(),
   country: z.string(),
@@ -100,8 +163,23 @@ export const analyzedCompanySchema = z.object({
   name: z.string().min(2).max(200),
   tradeName: z.string().max(200),
   domain: z.string().min(3).max(253),
-  vertical: z.string().min(2).max(100),
-  subsegment: z.string().min(2).max(120),
+  vertical: z.enum(verticalNames),
+  subsegment: z.enum(subverticalNames),
+  coreBusiness: z.string().min(20).max(600),
+  classificationReason: z.string().min(20).max(600),
+  classificationSourceUrl: z.string().min(8).max(2048),
+  classificationConfidence: z.number().int().min(0).max(100),
+  forbiddenSector: z.enum([
+    "none",
+    "banking",
+    "fintech",
+    "payments",
+    "insurance",
+    "investments",
+    "crypto",
+  ]),
+  revenueModel: z.enum(["services", "product", "mixed", "not_applicable"]),
+  serviceRevenuePercentage: z.number().int().min(0).max(100).nullable(),
   city: z.string().max(100),
   state: z.string().max(100),
   country: z.string().min(2).max(100),
@@ -112,11 +190,7 @@ export const analyzedCompanySchema = z.object({
   criteriaReason: z.string().min(10).max(500),
   criteriaConfidence: z.number().int().min(0).max(100),
   description: z.string().min(20).max(800),
-  solution: z.enum(solutions),
-  apiScore: z.number().int().min(0).max(100),
-  waapScore: z.number().int().min(0).max(100),
-  guardicoreScore: z.number().int().min(0).max(100),
-  breakdown: scoreBreakdownSchema,
+  signals: companySignalsSchema,
   recommendation: z.string().min(20).max(800),
   evidence: z.array(analyzedEvidenceSchema).min(1).max(12),
   titles: z.array(z.string().min(2).max(100)).max(12),

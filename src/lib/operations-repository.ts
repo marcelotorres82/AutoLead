@@ -4,6 +4,8 @@ import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { lushaUsage, personas, verticals } from "@/db/schema";
 import type { Persona, VerticalView } from "@/lib/operations-types";
+import { verticalTaxonomy } from "@/lib/domain";
+import { leadReviewStatuses, type LeadReviewStatus } from "@/lib/lead-domain";
 
 export async function listPersonas(): Promise<Persona[]> {
   const rows = await getDb()
@@ -16,6 +18,18 @@ export async function listPersonas(): Promise<Persona[]> {
     title: row.title,
     companyId: row.companyId,
     profileUrl: row.profileUrl ?? undefined,
+    sourceUrl: row.sourceUrl ?? undefined,
+    sourceTitle: row.sourceTitle ?? undefined,
+    evidence: row.evidence ?? undefined,
+    confidence: row.confidence ?? undefined,
+    employmentStatus: row.employmentStatus ?? undefined,
+    reviewStatus: leadReviewStatuses.includes(
+      row.reviewStatus as LeadReviewStatus,
+    )
+      ? (row.reviewStatus as LeadReviewStatus)
+      : "Pendente de validação",
+    originRunId: row.originRunId ?? undefined,
+    researchedAt: row.researchedAt?.toISOString(),
     seniority: row.seniority ?? "Não informado",
     area: row.area ?? "Não informado",
     solution: row.solution ?? "WAAP",
@@ -37,6 +51,14 @@ export async function createPersona(
       name: input.name,
       title: input.title,
       profileUrl: input.profileUrl || null,
+      sourceUrl: input.sourceUrl || null,
+      sourceTitle: input.sourceTitle || null,
+      evidence: input.evidence || null,
+      confidence: input.confidence ?? null,
+      employmentStatus: input.employmentStatus || null,
+      reviewStatus: input.reviewStatus,
+      originRunId: input.originRunId || null,
+      researchedAt: input.researchedAt ? new Date(input.researchedAt) : null,
       seniority: input.seniority,
       area: input.area,
       solution:
@@ -51,6 +73,18 @@ export async function createPersona(
     })
     .returning();
   return (await listPersonas()).find((item) => item.id === row.id)!;
+}
+
+export async function updatePersonaReviewStatus(
+  id: string,
+  reviewStatus: LeadReviewStatus,
+) {
+  const [row] = await getDb()
+    .update(personas)
+    .set({ reviewStatus, updatedAt: new Date() })
+    .where(eq(personas.id, id))
+    .returning({ id: personas.id });
+  return Boolean(row);
 }
 
 function currentMonth() {
@@ -90,6 +124,10 @@ export async function listVerticals(): Promise<VerticalView[]> {
     id: row.id,
     name: row.name,
     description: row.description ?? undefined,
+    subverticals:
+      row.name in verticalTaxonomy
+        ? verticalTaxonomy[row.name as keyof typeof verticalTaxonomy]
+        : [],
     active: row.active,
   }));
 }

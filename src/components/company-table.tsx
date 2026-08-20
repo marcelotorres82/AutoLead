@@ -8,6 +8,7 @@ import {
   Linkedin,
   Pause,
   Trash2,
+  UserSearch,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useDemoStore } from "@/components/demo-store";
@@ -16,12 +17,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { CompanyStatus } from "@/lib/domain";
 export function CompanyTable() {
-  const { companies, updateStatus } = useDemoStore();
+  const { companies, updateStatus, enqueueLeadResearch } = useDemoStore();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Todos");
   const [min, setMin] = useState(0);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [leadSearchPending, setLeadSearchPending] = useState(false);
   const filtered = useMemo(
     () =>
       companies.filter(
@@ -40,6 +42,16 @@ export function CompanyTable() {
     (safePage - 1) * pageSize,
     safePage * pageSize,
   );
+  const selectedCompanies = useMemo(
+    () => companies.filter((company) => selected.has(company.id)),
+    [companies, selected],
+  );
+  const canResearchLeads =
+    selectedCompanies.length > 0 &&
+    selectedCompanies.length <= 5 &&
+    selectedCompanies.every(
+      (company) => company.status === "Aprovada para pesquisar leads",
+    );
   const change = async (id: string, value: CompanyStatus) => {
     try {
       await updateStatus(id, value);
@@ -92,18 +104,61 @@ export function CompanyTable() {
           />
           <strong>{min}</strong>
         </label>
-        {selected.size ? (
-          <Button asChild variant="outline">
-            <a href={`/api/export/csv?ids=${Array.from(selected).join(",")}`}>
-              <Download className="size-4" />
-              Exportar {selected.size} selecionadas
-            </a>
+        <div className="flex gap-2">
+          {selected.size ? (
+            <Button asChild variant="outline" className="flex-1">
+              <a href={`/api/export/csv?ids=${Array.from(selected).join(",")}`}>
+                <Download className="size-4" />
+                Exportar {selected.size}
+              </a>
+            </Button>
+          ) : (
+            <Button disabled variant="outline" className="flex-1">
+              <Download className="size-4" /> Exportar
+            </Button>
+          )}
+          <Button
+            className="flex-1"
+            disabled={!canResearchLeads || leadSearchPending}
+            title={
+              selectedCompanies.length > 5
+                ? "Selecione no máximo 5 empresas"
+                : selectedCompanies.some(
+                      (company) =>
+                        company.status !== "Aprovada para pesquisar leads",
+                    )
+                  ? "Aprove todas as empresas selecionadas antes da pesquisa"
+                  : "Pesquisar decisores nas empresas selecionadas"
+            }
+            onClick={async () => {
+              const confirmed = window.confirm(
+                `Pesquisar leads em ${selectedCompanies.length} empresa${selectedCompanies.length === 1 ? "" : "s"}? Serão feitas 4 consultas Tavily por empresa, usando apenas o plano já configurado.`,
+              );
+              if (!confirmed) return;
+              setLeadSearchPending(true);
+              try {
+                const runs = await enqueueLeadResearch(
+                  selectedCompanies.map((company) => company.id),
+                );
+                toast.success(
+                  `${runs.length} pesquisa${runs.length === 1 ? "" : "s"} de leads iniciada${runs.length === 1 ? "" : "s"}`,
+                );
+                setSelected(new Set());
+              } catch (error) {
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : "Falha ao iniciar pesquisa de leads",
+                );
+              } finally {
+                setLeadSearchPending(false);
+              }
+            }}
+          >
+            <UserSearch className="size-4" />
+            Leads
           </Button>
-        ) : (
-          <Button disabled variant="outline">
-            <Download className="size-4" /> Selecione para exportar
-          </Button>
-        )}
+        </div>
       </div>
       <div className="overflow-x-auto rounded-xl border bg-white dark:bg-slate-900">
         <table className="w-full min-w-[1000px] text-left text-sm">
@@ -190,7 +245,10 @@ export function CompanyTable() {
                     </p>
                   ) : null}
                 </td>
-                <td className="p-4">{c.vertical}</td>
+                <td className="p-4">
+                  <span>{c.vertical}</span>
+                  <p className="mt-1 text-xs text-slate-500">{c.subsegment}</p>
+                </td>
                 <td className="p-4">
                   {c.linkedinUrl ? (
                     <a

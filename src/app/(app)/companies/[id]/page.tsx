@@ -57,7 +57,7 @@ export default function CompanyDetail() {
           </div>
           <h1 className="mt-3 text-2xl font-bold md:text-3xl">{c.name}</h1>
           <p className="mt-1 text-sm text-slate-500">
-            {c.domain} · {c.city}/{c.state} · {c.size}
+            {c.domain} · {c.city}/{c.state} · {c.size} · {c.subsegment}
           </p>
           {c.linkedinUrl ? (
             <a
@@ -104,6 +104,30 @@ export default function CompanyDetail() {
               <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
                 {c.description}
               </p>
+              {c.coreBusiness ? (
+                <div className="mt-4 rounded-lg border p-4 text-sm">
+                  <p>
+                    <strong>Core business:</strong> {c.coreBusiness}
+                  </p>
+                  {c.classificationReason ? (
+                    <p className="mt-2 text-slate-600 dark:text-slate-300">
+                      <strong>Justificativa da classificação:</strong>{" "}
+                      {c.classificationReason}
+                    </p>
+                  ) : null}
+                  {c.classificationSourceUrl ? (
+                    <a
+                      className="mt-2 inline-flex items-center gap-1 text-cyan-700 hover:underline dark:text-cyan-300"
+                      href={c.classificationSourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Fonte da classificação
+                      <ExternalLink className="size-3" />
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="mt-4 rounded-lg bg-cyan-50 p-4 text-sm text-cyan-950 dark:bg-cyan-950/30 dark:text-cyan-100">
                 <strong>Motivo da recomendação:</strong> {c.recommendation}
               </div>

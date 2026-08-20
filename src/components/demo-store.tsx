@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { demoCompanies } from "@/lib/demo-data";
 import { dateInSaoPaulo, type Company, type CompanyStatus } from "@/lib/domain";
 import type { Persona } from "@/lib/operations-types";
+import type { LeadReviewStatus } from "@/lib/lead-domain";
 import type { ResearchRunView } from "@/lib/research-run-repository";
 
 export type { Persona } from "@/lib/operations-types";
@@ -17,6 +18,11 @@ type Store = {
   updateStatus(id: string, status: CompanyStatus): Promise<void>;
   generate(query?: string): Promise<{ created: number; provider: string }>;
   addPersona(persona: Omit<Persona, "id">): Promise<void>;
+  enqueueLeadResearch(companyIds: string[]): Promise<ResearchRunView[]>;
+  updatePersonaReview(
+    id: string,
+    reviewStatus: LeadReviewStatus,
+  ): Promise<void>;
   setLushaUsed(value: number): Promise<void>;
 };
 
@@ -35,6 +41,7 @@ const demoPersonas: Persona[] = [
     role: "Decisor",
     lushaCreditUsed: true,
     sentToSalesloft: false,
+    reviewStatus: "Aprovado",
   },
 ];
 
@@ -130,12 +137,22 @@ export function DemoStoreProvider({
             : items;
         });
         if (updates.some((run) => run.status === "completed")) {
-          const response = await fetch("/api/companies", {
-            cache: "no-store",
-          });
-          if (response.ok) {
-            const result = await response.json();
+          const hasCompletedLeadResearch = updates.some(
+            (run) => run.status === "completed" && run.researchType === "leads",
+          );
+          const [companiesResponse, personasResponse] = await Promise.all([
+            fetch("/api/companies", { cache: "no-store" }),
+            hasCompletedLeadResearch
+              ? fetch("/api/personas", { cache: "no-store" })
+              : Promise.resolve(null),
+          ]);
+          if (companiesResponse.ok) {
+            const result = await companiesResponse.json();
             if (Array.isArray(result.companies)) setCompanies(result.companies);
+          }
+          if (personasResponse?.ok) {
+            const result = await personasResponse.json();
+            if (Array.isArray(result.personas)) setPersonas(result.personas);
           }
         }
       } finally {
@@ -274,6 +291,95 @@ export function DemoStoreProvider({
           { ...persona, id: crypto.randomUUID() },
           ...items,
         ]);
+      },
+      async enqueueLeadResearch(companyIds) {
+        if (demoMode) {
+          const now = new Date().toISOString();
+          const newPersonas = companyIds.flatMap((companyId, index) => {
+            const company = companies.find((item) => item.id === companyId);
+            if (!company) return [];
+            return [
+              {
+                id: crypto.randomUUID(),
+                name: `Decisor Exemplo ${index + 1}`,
+                title: "Diretor de Segurança (Demonstração)",
+                companyId,
+                seniority: "Diretoria",
+                area: "Segurança",
+                solution: company.solution,
+                priority: 1,
+                role: "Decisor",
+                lushaCreditUsed: false,
+                sentToSalesloft: false,
+                reviewStatus: "Pendente de validação" as const,
+                confidence: 82,
+                employmentStatus: "provável",
+                evidence: "Evidência fictícia exclusiva do modo demonstração.",
+                researchedAt: now,
+              },
+            ];
+          });
+          setPersonas((items) => [...newPersonas, ...items]);
+          const runs = companyIds.map((companyId) => {
+            const company = companies.find((item) => item.id === companyId);
+            return {
+              id: crypto.randomUUID(),
+              date: dateInSaoPaulo(),
+              kind: `leads-demo-${companyId}`,
+              status: "completed",
+              provider: "demo",
+              searchCount: 4,
+              foundCount: 1,
+              duplicateCount: 0,
+              estimatedCost: 0,
+              errors: [],
+              stage: "completed",
+              progress: 100,
+              createdAt: now,
+              completedAt: now,
+              researchType: "leads" as const,
+              companyId,
+              companyName: company?.name,
+            } satisfies ResearchRunView;
+          });
+          setResearchRuns((items) => [...runs, ...items]);
+          return runs;
+        }
+        const response = await fetch("/api/leads/research", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ companyIds }),
+        });
+        const result = await response.json();
+        if (!response.ok)
+          throw new Error(result.error ?? "Falha ao iniciar pesquisa de leads");
+        const runs = result.runs as ResearchRunView[];
+        setResearchRuns((items) => [
+          ...runs,
+          ...items.filter((item) => !runs.some((run) => run.id === item.id)),
+        ]);
+        return runs;
+      },
+      async updatePersonaReview(id, reviewStatus) {
+        const previous = personas.find((persona) => persona.id === id);
+        setPersonas((items) =>
+          items.map((persona) =>
+            persona.id === id ? { ...persona, reviewStatus } : persona,
+          ),
+        );
+        if (demoMode) return;
+        const response = await fetch(`/api/personas/${id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ reviewStatus }),
+        });
+        if (!response.ok) {
+          if (previous)
+            setPersonas((items) =>
+              items.map((persona) => (persona.id === id ? previous : persona)),
+            );
+          throw new Error("Falha ao salvar revisão da persona");
+        }
       },
       async setLushaUsed(value) {
         const previous = lushaUsed;

@@ -233,6 +233,18 @@ export const personas = pgTable(
     name: text("name").notNull(),
     title: text("title").notNull(),
     profileUrl: text("profile_url"),
+    sourceUrl: text("source_url"),
+    sourceTitle: text("source_title"),
+    evidence: text("evidence"),
+    confidence: integer("confidence"),
+    employmentStatus: text("employment_status"),
+    reviewStatus: text("review_status")
+      .notNull()
+      .default("Pendente de validação"),
+    originRunId: uuid("origin_run_id").references(() => researchRuns.id, {
+      onDelete: "set null",
+    }),
+    researchedAt: timestamp("researched_at", { withTimezone: true }),
     seniority: text("seniority"),
     area: text("area"),
     solution: solutionEnum("solution"),
@@ -245,7 +257,11 @@ export const personas = pgTable(
     notes: text("notes"),
     ...timestamps,
   },
-  (t) => [index("personas_company_idx").on(t.companyId)],
+  (t) => [
+    index("personas_company_idx").on(t.companyId),
+    index("personas_review_status_idx").on(t.reviewStatus),
+    index("personas_origin_run_idx").on(t.originRunId),
+  ],
 );
 export const lushaUsage = pgTable(
   "lusha_usage",

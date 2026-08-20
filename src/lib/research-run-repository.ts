@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { researchRuns } from "@/db/schema";
 
@@ -9,6 +9,12 @@ export type ResearchRunMetadata = {
   stage?: string;
   progress?: number;
   workflowRunId?: string;
+  researchType?: "companies" | "leads";
+  companyId?: string;
+  companyName?: string;
+  rejectedCount?: number;
+  manualReviewCount?: number;
+  rejectionReasons?: Record<string, number>;
 };
 
 export type ResearchRunView = {
@@ -29,6 +35,12 @@ export type ResearchRunView = {
   progress: number;
   createdAt: string;
   completedAt?: string;
+  researchType?: "companies" | "leads";
+  companyId?: string;
+  companyName?: string;
+  rejectedCount?: number;
+  manualReviewCount?: number;
+  rejectionReasons?: Record<string, number>;
 };
 
 function toView(row: typeof researchRuns.$inferSelect): ResearchRunView {
@@ -51,6 +63,12 @@ function toView(row: typeof researchRuns.$inferSelect): ResearchRunView {
     progress: metadata.progress ?? (row.status === "completed" ? 100 : 0),
     createdAt: row.createdAt.toISOString(),
     completedAt: row.completedAt?.toISOString(),
+    researchType: metadata.researchType,
+    companyId: metadata.companyId,
+    companyName: metadata.companyName,
+    rejectedCount: metadata.rejectedCount ?? 0,
+    manualReviewCount: metadata.manualReviewCount ?? 0,
+    rejectionReasons: metadata.rejectionReasons ?? {},
   };
 }
 
@@ -104,6 +122,22 @@ export async function listResearchRuns(limit = 20) {
     .orderBy(desc(researchRuns.createdAt))
     .limit(limit);
   return rows.map(toView);
+}
+
+export async function findActiveLeadResearchRun(companyId: string) {
+  const rows = await getDb()
+    .select()
+    .from(researchRuns)
+    .where(inArray(researchRuns.status, ["queued", "running"]))
+    .orderBy(desc(researchRuns.createdAt))
+    .limit(100);
+  const row = rows.find((item) => {
+    const metadata = (item.metadata ?? {}) as ResearchRunMetadata;
+    return (
+      metadata.researchType === "leads" && metadata.companyId === companyId
+    );
+  });
+  return row ? toView(row) : null;
 }
 
 export async function updateResearchRunMetadata(

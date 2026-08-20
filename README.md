@@ -6,7 +6,9 @@ Aplicação web single-user para pesquisar, triar e priorizar empresas antes da 
 
 - Next.js 16 (App Router), React 19, TypeScript strict, Tailwind CSS 4, componentes shadcn/ui/Radix e Lucide.
 - Neon Postgres via `@neondatabase/serverless`, Drizzle ORM/Kit e migrations versionadas.
-- Tavily para pesquisa pública e Gemini (principal) ou OpenAI (fallback) para análise estruturada validada por Zod.
+- Tavily para pesquisa pública e Gemini (principal) ou OpenAI (fallback) para extração estruturada de sinais validada por Zod.
+- Taxonomia fechada de nove verticais e suas subverticais, classificada pelo core business com fonte oficial, justificativa e confiança mínima obrigatórias.
+- Gate determinístico bloqueia verticais inativas, financeiro/fintech e empresas de tecnologia orientadas a produto; scores são calculados no backend a partir de sinais, nunca aceitos diretamente da IA.
 - Vercel Blob privado para backups JSON; Vercel Cron para pesquisa nos dias úteis.
 - Vitest para domínio e Playwright para fluxos essenciais.
 
@@ -58,7 +60,7 @@ npm run db:migrate
 npm run db:seed
 ```
 
-O seed é idempotente: cadastra as oito verticais, metas 30/150, limites operacionais e o mês atual do controle Lusha.
+O seed é idempotente: cadastra as nove verticais e suas subverticais oficiais, metas 30/150, limites operacionais e o mês atual do controle Lusha. Rode-o novamente após atualizar uma instalação existente para incluir `Video Media` e atualizar as descrições da taxonomia.
 
 ## Tavily, Gemini, OpenAI e Blob
 
@@ -66,9 +68,25 @@ Crie chaves nos painéis dos provedores e salve-as exclusivamente nas variáveis
 
 Sem qualquer uma das integrações principais, o banner de demonstração permanece ativo e chamadas reais são desabilitadas com orientação na tela.
 
+## Pesquisa de leads nas empresas aprovadas
+
+Depois de mudar uma empresa para `Aprovada para pesquisar leads`, selecione até cinco contas na tabela e use **Leads**. Cada empresa inicia um workflow independente com quatro consultas Tavily complementares: cargos e liderança, perfis públicos indexados do LinkedIn, página institucional da equipe e movimentações profissionais recentes. O limite por lote contém o consumo da franquia já configurada; nenhum provedor pago adicional é necessário.
+
+O fluxo não acessa uma sessão do LinkedIn, não automatiza Sales Navigator e não coleta e-mail ou telefone. A IA só pode criar candidatos apoiados por URLs retornadas na pesquisa, limita a confiança quando o vínculo é provável ou incerto e salva tudo como `Pendente de validação`. Na tela Personas, confirme cargo e empresa atual manualmente — idealmente no Sales Navigator —, aprove ou descarte e somente então consulte o Lusha manualmente quando fizer sentido.
+
+Resultados repetidos são comparados por URL de perfil ou pela combinação nome + cargo dentro da mesma empresa. Assim, uma nova pesquisa reaproveita o histórico sem eliminar homônimos que ocupem funções diferentes.
+
 ## Pesquisa diária e Cron
 
 `vercel.json` agenda `GET /api/cron/daily-research` com `0 10 * * 1-5`. Cron usa UTC: 10:00 UTC corresponde a 07:00 em Brasília quando UTC-3. O endpoint exige `Authorization: Bearer ${CRON_SECRET}` e usa data de Brasília como chave de idempotência. A estratégia prevista é busca ampla por vertical, normalização/deduplicação, análise em lote e enriquecimento sob demanda — não 30 análises profundas dentro da mesma função.
+
+A classificação considera a principal fonte de receita ou missão institucional. Canal digital, e-commerce, aplicativo ou portal secundário não altera a vertical. A persistência rejeita pares vertical/subvertical fora da taxonomia e exige uma fonte retornada pela busca para comprovar o core business; não há fallback automático para `Other Media`.
+
+O gate de persistência exige confiança de classificação de pelo menos 85, vertical ativa e fonte institucional no domínio oficial. Financeiro, fintech, bancos, seguros, crédito, investimentos e cripto são bloqueados. Em `Consultoria e serviços de TI`, empresas de produto são bloqueadas; negócios mistos com 40–60% de serviços, ou sem percentual sustentado, não entram automaticamente e são contabilizados para revisão. URLs locais, reservadas, privadas ou com credenciais são descartadas.
+
+A IA extrai sinais conservadores de porte, presença digital, exposição transacional, crescimento, APIs, cloud, workloads distribuídos e qualidade da evidência. Fórmulas versionadas no backend calculam o breakdown, os três scores e a solução sugerida, garantindo que a mesma entrada produza o mesmo resultado. A execução registra quantos candidatos foram rejeitados e os motivos. A meta diária continua sendo um objetivo, não uma licença para completar a lista com dados sintéticos: falhas de busca ou evidência podem resultar em menos de 30 empresas.
+
+Antes de analisar as fontes, o fluxo envia à IA o inventário de nomes, nomes fantasia, aliases e domínios já persistidos. Os resultados das consultas são intercalados por posição, normalizados por URL e limitados por domínio antes do corte de contexto, evitando que as primeiras verticais ou um único portal ocupem toda a análise.
 
 Teste manualmente:
 
@@ -89,7 +107,7 @@ Confira no plano Vercel escolhido a disponibilidade e precisão do Cron e o limi
 
 Sessões são JWT assinadas em cookie HTTP-only, `sameSite=lax` e `secure` em produção. Login possui rate limit em memória (troque por store compartilhado em escala horizontal), verificação de origem e bcrypt custo 12. CSP e headers de segurança são configurados em `next.config.ts`. Adaptadores externos têm timeout, validação Zod e bloqueio básico de SSRF/protocolos/IPs privados. Não são registrados segredos, sessões ou cabeçalhos sensíveis.
 
-Não faça scraping/login/navegação automática no LinkedIn, não solicite credenciais corporativas e não use a aplicação para port scanning, pentest ou alegações de vulnerabilidade. URLs de perfil e estados de Salesforce/Lusha/SalesLoft são campos manuais e pessoais, sem sincronização.
+Não faça scraping/login/navegação automática no LinkedIn, não solicite credenciais corporativas e não use a aplicação para port scanning, pentest ou alegações de vulnerabilidade. A pesquisa de pessoas aceita apenas URLs públicas já indexadas pelo Tavily; a validação em Sales Navigator e o uso de Lusha continuam manuais, sem sincronização.
 
 ## Qualidade
 
