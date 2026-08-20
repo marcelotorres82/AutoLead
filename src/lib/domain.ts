@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { companySignalsSchema } from "@/lib/company-signals";
 
 export const companyStatuses = [
   "Nova",
@@ -167,6 +168,18 @@ export const analyzedCompanySchema = z.object({
   coreBusiness: z.string().min(20).max(600),
   classificationReason: z.string().min(20).max(600),
   classificationSourceUrl: z.string().min(8).max(2048),
+  classificationConfidence: z.number().int().min(0).max(100),
+  forbiddenSector: z.enum([
+    "none",
+    "banking",
+    "fintech",
+    "payments",
+    "insurance",
+    "investments",
+    "crypto",
+  ]),
+  revenueModel: z.enum(["services", "product", "mixed", "not_applicable"]),
+  serviceRevenuePercentage: z.number().int().min(0).max(100).nullable(),
   city: z.string().max(100),
   state: z.string().max(100),
   country: z.string().min(2).max(100),
@@ -177,11 +190,7 @@ export const analyzedCompanySchema = z.object({
   criteriaReason: z.string().min(10).max(500),
   criteriaConfidence: z.number().int().min(0).max(100),
   description: z.string().min(20).max(800),
-  solution: z.enum(solutions),
-  apiScore: z.number().int().min(0).max(100),
-  waapScore: z.number().int().min(0).max(100),
-  guardicoreScore: z.number().int().min(0).max(100),
-  breakdown: scoreBreakdownSchema,
+  signals: companySignalsSchema,
   recommendation: z.string().min(20).max(800),
   evidence: z.array(analyzedEvidenceSchema).min(1).max(12),
   titles: z.array(z.string().min(2).max(100)).max(12),

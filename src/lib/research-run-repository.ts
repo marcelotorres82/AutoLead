@@ -12,6 +12,9 @@ export type ResearchRunMetadata = {
   researchType?: "companies" | "leads";
   companyId?: string;
   companyName?: string;
+  rejectedCount?: number;
+  manualReviewCount?: number;
+  rejectionReasons?: Record<string, number>;
 };
 
 export type ResearchRunView = {
@@ -35,6 +38,9 @@ export type ResearchRunView = {
   researchType?: "companies" | "leads";
   companyId?: string;
   companyName?: string;
+  rejectedCount?: number;
+  manualReviewCount?: number;
+  rejectionReasons?: Record<string, number>;
 };
 
 function toView(row: typeof researchRuns.$inferSelect): ResearchRunView {
@@ -60,6 +66,9 @@ function toView(row: typeof researchRuns.$inferSelect): ResearchRunView {
     researchType: metadata.researchType,
     companyId: metadata.companyId,
     companyName: metadata.companyName,
+    rejectedCount: metadata.rejectedCount ?? 0,
+    manualReviewCount: metadata.manualReviewCount ?? 0,
+    rejectionReasons: metadata.rejectionReasons ?? {},
   };
 }
 

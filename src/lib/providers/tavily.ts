@@ -37,13 +37,21 @@ export class TavilySearchProvider implements WebSearchProvider {
       if (!response.ok) throw new Error(`Tavily respondeu ${response.status}`);
       return responseSchema
         .parse(await response.json())
-        .results.map((item) => ({
-          title: item.title,
-          url: assertSafePublicUrl(item.url).toString(),
-          content: item.content,
-          publishedAt: item.published_date ?? undefined,
-          provider: this.name,
-        }));
+        .results.flatMap((item) => {
+          try {
+            return [
+              {
+                title: item.title,
+                url: assertSafePublicUrl(item.url).toString(),
+                content: item.content,
+                publishedAt: item.published_date ?? undefined,
+                provider: this.name,
+              },
+            ];
+          } catch {
+            return [];
+          }
+        });
     } finally {
       clearTimeout(timer);
     }

@@ -39,6 +39,10 @@ describe("Gemini", () => {
       classificationReason:
         "A descrição institucional apresenta serviços de TI como atividade principal.",
       classificationSourceUrl: "https://example.com/fonte",
+      classificationConfidence: 92,
+      forbiddenSector: "none" as const,
+      revenueModel: "services" as const,
+      serviceRevenuePercentage: 100,
       city: "São Paulo",
       state: "SP",
       country: "Brasil",
@@ -49,18 +53,18 @@ describe("Gemini", () => {
       criteriaReason: "O porte informado está dentro do limite solicitado.",
       criteriaConfidence: 85,
       description: "Empresa brasileira com operação digital documentada.",
-      solution: "API Security" as const,
-      apiScore: 70,
-      waapScore: 60,
-      guardicoreScore: 40,
-      breakdown: {
-        verticalFit: 15,
-        sizeComplexity: 10,
-        digitalPresence: 15,
-        transactionalChannels: 10,
-        recentSignals: 10,
-        solutionFit: 8,
-        evidenceQuality: 8,
+      signals: {
+        employeeScale: "medium" as const,
+        digitalPresence: "multi_channel" as const,
+        transactionalExposure: "significant" as const,
+        recentGrowth: "weak" as const,
+        hasPublicApis: true,
+        hasMobileOrWebApps: true,
+        hasCloudFootprint: false,
+        hasSecurityHiring: false,
+        hasDistributedWorkloads: false,
+        handlesSensitiveData: true,
+        evidenceQuality: "high" as const,
       },
       recommendation:
         "Validar os canais digitais e iniciar contato consultivo.",
@@ -109,7 +113,7 @@ describe("Gemini", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(analyzed).toHaveLength(1);
-    expect(analyzed[0].breakdown.evidenceQuality).toBe(5);
+    expect(analyzed[0].signals.evidenceQuality).toBe("high");
     const request = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(request.generationConfig.thinkingConfig).toEqual({
       thinkingBudget: 0,

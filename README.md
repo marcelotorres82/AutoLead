@@ -6,8 +6,9 @@ Aplicação web single-user para pesquisar, triar e priorizar empresas antes da 
 
 - Next.js 16 (App Router), React 19, TypeScript strict, Tailwind CSS 4, componentes shadcn/ui/Radix e Lucide.
 - Neon Postgres via `@neondatabase/serverless`, Drizzle ORM/Kit e migrations versionadas.
-- Tavily para pesquisa pública e Gemini (principal) ou OpenAI (fallback) para análise estruturada validada por Zod.
-- Taxonomia fechada de nove verticais e suas subverticais, classificada pelo core business com fonte e justificativa obrigatórias.
+- Tavily para pesquisa pública e Gemini (principal) ou OpenAI (fallback) para extração estruturada de sinais validada por Zod.
+- Taxonomia fechada de nove verticais e suas subverticais, classificada pelo core business com fonte oficial, justificativa e confiança mínima obrigatórias.
+- Gate determinístico bloqueia verticais inativas, financeiro/fintech e empresas de tecnologia orientadas a produto; scores são calculados no backend a partir de sinais, nunca aceitos diretamente da IA.
 - Vercel Blob privado para backups JSON; Vercel Cron para pesquisa nos dias úteis.
 - Vitest para domínio e Playwright para fluxos essenciais.
 
@@ -80,6 +81,10 @@ Resultados repetidos são comparados por URL de perfil ou pela combinação nome
 `vercel.json` agenda `GET /api/cron/daily-research` com `0 10 * * 1-5`. Cron usa UTC: 10:00 UTC corresponde a 07:00 em Brasília quando UTC-3. O endpoint exige `Authorization: Bearer ${CRON_SECRET}` e usa data de Brasília como chave de idempotência. A estratégia prevista é busca ampla por vertical, normalização/deduplicação, análise em lote e enriquecimento sob demanda — não 30 análises profundas dentro da mesma função.
 
 A classificação considera a principal fonte de receita ou missão institucional. Canal digital, e-commerce, aplicativo ou portal secundário não altera a vertical. A persistência rejeita pares vertical/subvertical fora da taxonomia e exige uma fonte retornada pela busca para comprovar o core business; não há fallback automático para `Other Media`.
+
+O gate de persistência exige confiança de classificação de pelo menos 85, vertical ativa e fonte institucional no domínio oficial. Financeiro, fintech, bancos, seguros, crédito, investimentos e cripto são bloqueados. Em `Consultoria e serviços de TI`, empresas de produto são bloqueadas; negócios mistos com 40–60% de serviços, ou sem percentual sustentado, não entram automaticamente e são contabilizados para revisão. URLs locais, reservadas, privadas ou com credenciais são descartadas.
+
+A IA extrai sinais conservadores de porte, presença digital, exposição transacional, crescimento, APIs, cloud, workloads distribuídos e qualidade da evidência. Fórmulas versionadas no backend calculam o breakdown, os três scores e a solução sugerida, garantindo que a mesma entrada produza o mesmo resultado. A execução registra quantos candidatos foram rejeitados e os motivos. A meta diária continua sendo um objetivo, não uma licença para completar a lista com dados sintéticos: falhas de busca ou evidência podem resultar em menos de 30 empresas.
 
 Antes de analisar as fontes, o fluxo envia à IA o inventário de nomes, nomes fantasia, aliases e domínios já persistidos. Os resultados das consultas são intercalados por posição, normalizados por URL e limitados por domínio antes do corte de contexto, evitando que as primeiras verticais ou um único portal ocupem toda a análise.
 

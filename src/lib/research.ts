@@ -195,18 +195,16 @@ export async function runDailyResearch(
       stage: "searching",
     });
 
-    const activeVerticalRows = criteria
-      ? []
-      : await db
-          .select({ name: verticals.name })
-          .from(verticals)
-          .where(eq(verticals.active, true));
+    const activeVerticalRows = await db
+      .select({ name: verticals.name })
+      .from(verticals)
+      .where(eq(verticals.active, true));
+    if (!activeVerticalRows.length)
+      throw new Error("Nenhuma vertical de pesquisa está ativa");
     const queries = buildSearchQueries(
       criteria,
       activeVerticalRows.map((item) => item.name),
     );
-    if (!queries.length)
-      throw new Error("Nenhuma vertical de pesquisa está ativa");
     const tavily = new TavilySearchProvider();
     const searches = await Promise.allSettled(
       queries.map((query) => tavily.search(query, 12)),
@@ -285,6 +283,9 @@ export async function runDailyResearch(
       criteria,
       stage: "completed",
       progress: 100,
+      rejectedCount: persisted.rejectedCount,
+      manualReviewCount: persisted.manualReviewCount,
+      rejectionReasons: persisted.rejectionReasons,
     });
     researchLog("info", "research_completed", {
       runId,
@@ -292,6 +293,9 @@ export async function runDailyResearch(
       durationMs,
       created: persisted.created,
       duplicateCount: persisted.duplicateCount,
+      rejectedCount: persisted.rejectedCount,
+      manualReviewCount: persisted.manualReviewCount,
+      rejectionReasons: persisted.rejectionReasons,
       provider: providerName,
     });
     return {
@@ -299,6 +303,9 @@ export async function runDailyResearch(
       date,
       created: persisted.created,
       duplicateCount: persisted.duplicateCount,
+      rejectedCount: persisted.rejectedCount,
+      manualReviewCount: persisted.manualReviewCount,
+      rejectionReasons: persisted.rejectionReasons,
       durationMs,
       provider: providerName,
       estimatedCost: 0,

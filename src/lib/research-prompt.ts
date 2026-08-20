@@ -18,10 +18,13 @@ ${verticalTaxonomyPrompt()}
 - Logística permanece Business Services. Fornecedor de tecnologia não herda a vertical dos clientes. Entidade pública segue sua esfera administrativa. Organização sem fins lucrativos permanece Non-Profit.
 - Marketplace deve ser classificado pelo modelo de negócio predominante. Se duas categorias forem possíveis, use a principal fonte de receita ou missão e explique.
 - classificationReason deve justificar o par escolhido; classificationSourceUrl deve ser a URL institucional que comprova o core business e deve existir exatamente nas fontes.
+- classificationConfidence mede de 0 a 100 a confiança na classificação; abaixo de 85 a empresa não será aceita automaticamente.
+- forbiddenSector deve marcar banking, fintech, payments, insurance, investments ou crypto quando esse for o core business; use none nos demais casos. Clientes atendidos pela empresa não definem o setor dela.
 - Se o core business ou o par exato não puder ser comprovado, não inclua a empresa. Não use uma categoria aproximada como fallback.
+- Para qualquer empresa de tecnologia, informe revenueModel. Use services para receita predominantemente de consultoria/serviços gerenciados, product para SaaS/software/cybersecurity/cloud próprio e mixed quando houver ambos. Em mixed, serviceRevenuePercentage só pode ser preenchido quando houver sustentação nas fontes; caso contrário use null. Para empresas que não são de tecnologia use not_applicable e null.
 
 ANÁLISE COMERCIAL
-- Sugira aderência a API Security, WAAP ou Guardicore apenas como hipótese e use pontuação conservadora.
-- Scores de solução vão de 0 a 100. Breakdown: verticalFit 0-20, sizeComplexity 0-15, digitalPresence 0-20, transactionalChannels 0-15, recentSignals 0-15, solutionFit 0-10 e evidenceQuality 0-5.
+- Extraia apenas os sinais estruturados solicitados. Não atribua scores nem escolha a solução; o backend calcula os valores deterministicamente.
+- Marque um sinal positivo somente quando uma das evidências fornecidas o sustentar. Na dúvida, use false, unknown, none ou low.
 - Preencha criteriaMatch, criteriaReason e criteriaConfidence apenas com evidências das fontes; use uncertain quando porte ou outro critério não puder ser confirmado.`;
 }

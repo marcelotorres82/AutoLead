@@ -14,12 +14,10 @@ import {
   verticals,
 } from "@/db/schema";
 import {
-  calculateScore,
   dateInSaoPaulo,
   extractEmployeeLimit,
   extractEmployeeUpperBound,
   findDuplicate,
-  isValidVerticalClassification,
   normalizeDomain,
   normalizeName,
   scoreBreakdownSchema,
@@ -29,9 +27,17 @@ import {
   type CompanyStatus,
   type ScoreBreakdown,
 } from "@/lib/domain";
+import { calculateCompanyScores } from "@/lib/company-scoring";
+import type { CompanySignals } from "@/lib/company-signals";
 import { env } from "@/lib/env";
 import type { SearchResult } from "@/lib/providers/types";
 import type { CompanyInventoryItem } from "@/lib/providers/types";
+import {
+  isOfficialCompanySource,
+  isPublicCompanyDomain,
+  isSafePublicUrl,
+} from "@/lib/security";
+import { evaluateVerticalGate } from "@/lib/vertical-gate";
 
 type AnalysisMetadata = {
   apiScore: number;
@@ -47,6 +53,18 @@ type AnalysisMetadata = {
   coreBusiness?: string;
   classificationReason?: string;
   classificationSourceUrl?: string;
+  classificationConfidence?: number;
+  forbiddenSector?:
+    | "none"
+    | "banking"
+    | "fintech"
+    | "payments"
+    | "insurance"
+    | "investments"
+    | "crypto";
+  revenueModel?: "services" | "product" | "mixed" | "not_applicable";
+  serviceRevenuePercentage?: number | null;
+  signals?: CompanySignals;
 };
 
 const emptyBreakdown: ScoreBreakdown = {
@@ -209,7 +227,10 @@ export async function persistAnalyzedCompanies(
   const db = getDb();
   const [inventory, verticalRows] = await Promise.all([
     listCompanyInventory(),
-    db.select({ id: verticals.id, name: verticals.name }).from(verticals),
+    db
+      .select({ id: verticals.id, name: verticals.name })
+      .from(verticals)
+      .where(eq(verticals.active, true)),
   ]);
   const known = inventory.flatMap((item) =>
     [item.name, item.tradeName, ...item.aliases]
@@ -217,11 +238,22 @@ export async function persistAnalyzedCompanies(
       .map((name) => ({ name, domain: item.domain })),
   );
   const verticalMap = new Map(verticalRows.map((row) => [row.name, row.id]));
+  const activeVerticals = new Set(verticalMap.keys());
   const resultByUrl = new Map(
-    searchResults.map((result) => [result.url, result]),
+    searchResults
+      .filter((result) => isSafePublicUrl(result.url))
+      .map((result) => [result.url, result]),
   );
   let created = 0;
   let duplicateCount = 0;
+  let rejectedCount = 0;
+  let manualReviewCount = 0;
+  const rejectionReasons: Record<string, number> = {};
+  const reject = (reason: string, requiresManualReview = false) => {
+    rejectedCount += 1;
+    if (requiresManualReview) manualReviewCount += 1;
+    rejectionReasons[reason] = (rejectionReasons[reason] ?? 0) + 1;
+  };
   const employeeLimit = extractEmployeeLimit(criteria);
 
   for (const candidate of candidates) {
@@ -231,16 +263,24 @@ export async function persistAnalyzedCompanies(
       (employeeLimit &&
         employeeUpperBound &&
         employeeUpperBound > employeeLimit)
-    )
+    ) {
+      reject("criteria_mismatch");
       continue;
-    if (
-      !isValidVerticalClassification(
-        candidate.vertical,
-        candidate.subsegment,
-      ) ||
-      !verticalMap.has(candidate.vertical)
-    )
+    }
+    const gate = evaluateVerticalGate({
+      vertical: candidate.vertical,
+      subvertical: candidate.subsegment,
+      coreBusiness: candidate.coreBusiness,
+      classificationConfidence: candidate.classificationConfidence,
+      forbiddenSector: candidate.forbiddenSector,
+      revenueModel: candidate.revenueModel,
+      serviceRevenuePercentage: candidate.serviceRevenuePercentage,
+      activeVerticals,
+    });
+    if (!gate.accepted) {
+      reject(gate.reason, gate.requiresManualReview);
       continue;
+    }
     const domain = normalizeDomain(candidate.domain);
     const duplicate = findDuplicate({ name: candidate.name, domain }, known);
     if (duplicate.duplicate) {
@@ -252,15 +292,21 @@ export async function persistAnalyzedCompanies(
     );
     if (
       !domain ||
+      !isPublicCompanyDomain(domain) ||
       !validEvidence.length ||
-      !resultByUrl.has(candidate.classificationSourceUrl)
-    )
+      !resultByUrl.has(candidate.classificationSourceUrl) ||
+      !isOfficialCompanySource(domain, candidate.classificationSourceUrl)
+    ) {
+      reject("unverified_public_source");
       continue;
-    const breakdown = scoreBreakdownSchema.parse(candidate.breakdown);
+    }
+    const { solution, scores, breakdown } = calculateCompanyScores(
+      candidate.signals,
+    );
     const metadata: AnalysisMetadata = {
-      apiScore: candidate.apiScore,
-      waapScore: candidate.waapScore,
-      guardicoreScore: candidate.guardicoreScore,
+      apiScore: scores["API Security"],
+      waapScore: scores.WAAP,
+      guardicoreScore: scores.Guardicore,
       breakdown,
       titles: candidate.titles,
       navigatorQuery: candidate.navigatorQuery,
@@ -274,6 +320,11 @@ export async function persistAnalyzedCompanies(
       coreBusiness: candidate.coreBusiness,
       classificationReason: candidate.classificationReason,
       classificationSourceUrl: candidate.classificationSourceUrl,
+      classificationConfidence: candidate.classificationConfidence,
+      forbiddenSector: candidate.forbiddenSector,
+      revenueModel: candidate.revenueModel,
+      serviceRevenuePercentage: candidate.serviceRevenuePercentage,
+      signals: candidate.signals,
     };
     const linkedinUrl = verifiedLinkedInCompanyUrl(
       candidate.linkedinUrl,
@@ -296,8 +347,8 @@ export async function persistAnalyzedCompanies(
         employeeRange: candidate.employees || null,
         linkedinUrl: linkedinUrl ?? null,
         description: candidate.description,
-        suggestedSolution: candidate.solution,
-        score: calculateScore(breakdown),
+        suggestedSolution: solution,
+        score: Object.values(breakdown).reduce((sum, value) => sum + value, 0),
         recommendation: candidate.recommendation,
         status: "Nova",
         possibleDuplicate: duplicate.possible,
@@ -325,19 +376,19 @@ export async function persistAnalyzedCompanies(
       {
         companyId: inserted.id,
         solution: "API Security",
-        score: candidate.apiScore,
+        score: scores["API Security"],
         breakdown,
       },
       {
         companyId: inserted.id,
         solution: "WAAP",
-        score: candidate.waapScore,
+        score: scores.WAAP,
         breakdown,
       },
       {
         companyId: inserted.id,
         solution: "Guardicore",
-        score: candidate.guardicoreScore,
+        score: scores.Guardicore,
         breakdown,
       },
     ]);
@@ -380,7 +431,13 @@ export async function persistAnalyzedCompanies(
     known.push({ name: candidate.name, domain });
     created += 1;
   }
-  return { created, duplicateCount };
+  return {
+    created,
+    duplicateCount,
+    rejectedCount,
+    manualReviewCount,
+    rejectionReasons,
+  };
 }
 
 export async function updateCompanyStatus(id: string, status: CompanyStatus) {
