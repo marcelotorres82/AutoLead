@@ -280,10 +280,7 @@ export async function runDailyResearch(
           .from(verticals)
           .where(eq(verticals.active, true));
 
-    const activeVerticalNames =
-      activeVerticalRows.length > 0
-        ? activeVerticalRows.map((item) => item.name)
-        : verticalNames;
+    const activeVerticalNames = activeVerticalRows.map((item) => item.name);
 
     const queries = buildSearchQueries(criteria, activeVerticalNames).slice(
       0,
@@ -377,6 +374,16 @@ export async function runDailyResearch(
           });
         }
       }
+    }
+
+    if (
+      candidates.length === 0 &&
+      aiProviders.length > 0 &&
+      providerErrors.length === aiProviders.length
+    ) {
+      throw new Error(
+        `Todos os provedores de IA falharam: ${providerErrors.join(" | ")}`,
+      );
     }
 
     if (candidates.length === 0)

@@ -3,6 +3,7 @@ import { zodTextFormat } from "openai/helpers/zod";
 import {
   aiLeadAnalysisSchema,
   buildLeadSearchQueries,
+  verifiedLeadEvidence,
   verifiedLinkedInPersonUrl,
 } from "@/lib/lead-domain";
 
@@ -36,6 +37,21 @@ describe("pesquisa de leads", () => {
       ]),
     ).toBeUndefined();
     expect(verifiedLinkedInPersonUrl(profile, [])).toBeUndefined();
+  });
+
+  it("mantém apenas evidências cujas URLs vieram exatamente da busca", () => {
+    const verifiedUrl = "https://example.com/lideranca";
+    const evidence = [
+      { sourceUrl: verifiedUrl, content: "Fonte pública confirmada" },
+      {
+        sourceUrl: "https://example.com/fonte-inventada",
+        content: "Fonte não retornada pela busca",
+      },
+    ];
+
+    expect(verifiedLeadEvidence(evidence, [verifiedUrl])).toEqual([
+      evidence[0],
+    ]);
   });
 
   it("valida evidência e vínculo sem exigir contato pessoal", () => {

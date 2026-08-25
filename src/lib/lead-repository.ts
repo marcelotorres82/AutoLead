@@ -5,6 +5,7 @@ import { getDb } from "@/db";
 import { companies, personas } from "@/db/schema";
 import { normalizeName } from "@/lib/domain";
 import {
+  verifiedLeadEvidence,
   verifiedLinkedInPersonUrl,
   type AnalyzedLead,
   type LeadResearchContext,
@@ -39,7 +40,10 @@ export async function getLeadResearchContexts(companyIds: string[]) {
       subsegment: row.subsegment ?? undefined,
       titles: metadata.titles ?? [],
       approved: row.status === "Aprovada para pesquisar leads",
-    } satisfies LeadResearchContext & { approved: boolean; subsegment?: string };
+    } satisfies LeadResearchContext & {
+      approved: boolean;
+      subsegment?: string;
+    };
   });
 }
 
@@ -78,14 +82,17 @@ export async function persistResearchedLeads(
 
   for (const candidate of candidates) {
     const identity = `${normalizeName(candidate.name)}|${normalizeName(candidate.title)}`;
-    
-    // Validar URL do LinkedIn
-    let profileUrl: string | null = null;
-    if (candidate.profileUrl && candidate.profileUrl.startsWith("https://") && candidate.profileUrl.includes("linkedin.com/in/")) {
-      profileUrl = candidate.profileUrl;
-    } else if (candidate.profileUrl) {
-      profileUrl = verifiedLinkedInPersonUrl(candidate.profileUrl, resultByUrl.keys()) ?? null;
-    }
+
+    const profileUrl = candidate.profileUrl
+      ? (verifiedLinkedInPersonUrl(candidate.profileUrl, resultByUrl.keys()) ??
+        null)
+      : null;
+
+    const evidence = verifiedLeadEvidence(
+      candidate.evidence,
+      resultByUrl.keys(),
+    );
+    if (!evidence.length) continue;
 
     if (
       knownIdentities.has(identity) ||
@@ -95,17 +102,9 @@ export async function persistResearchedLeads(
       continue;
     }
 
-    const firstEvidence = candidate.evidence[0];
-    const sourceUrl =
-      firstEvidence?.sourceUrl ||
-      `https://${context.domain || "empresa.com.br"}/lideranca`;
-    const sourceTitle =
-      resultByUrl.get(sourceUrl)?.title ||
-      `Estrutura e Liderança de TI - ${context.companyName}`;
-
-    const evidenceText = candidate.evidence.length > 0
-      ? candidate.evidence.map((item) => item.content).join("\n")
-      : `Evidência de liderança e atuação técnica em ${context.companyName} para a solução ${context.solution}.`;
+    const sourceUrl = evidence[0].sourceUrl;
+    const sourceTitle = resultByUrl.get(sourceUrl)!.title;
+    const evidenceText = evidence.map((item) => item.content).join("\n");
 
     await db.insert(personas).values({
       companyId: context.companyId,

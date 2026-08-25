@@ -136,3 +136,11 @@ export function verifiedLinkedInPersonUrl(
     return undefined;
   }
 }
+
+export function verifiedLeadEvidence<T extends { sourceUrl: string }>(
+  evidence: readonly T[],
+  sourceUrls: Iterable<string>,
+) {
+  const allowedUrls = new Set(sourceUrls);
+  return evidence.filter((item) => allowedUrls.has(item.sourceUrl));
+}
