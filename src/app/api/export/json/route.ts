@@ -24,11 +24,37 @@ export async function GET(request: Request) {
     : allCompanies;
   return NextResponse.json(
     {
-      schemaVersion: "1.0",
+      schemaVersion: "2.0",
       exportedAt: new Date().toISOString(),
       filters: { mode: demoMode ? "demo" : "real" },
       companies: companyList,
-      evidence: companyList.flatMap((c) => c.sources),
+      evidence: companyList.flatMap(
+        (c) =>
+          c.evidenceDetails ??
+          c.sources.map((source) => ({
+            id: source.id,
+            companyId: c.id,
+            type: "other",
+            statementKind: "FACT" as const,
+            claim: source.summary,
+            sourceUrl: source.url,
+            sourceTitle: source.title,
+            publisher: source.domain,
+            publishedAt: source.publishedAt,
+            collectedAt: source.accessedAt,
+            confidence: 0,
+            sourceQuality: 0,
+            freshnessScore: 0,
+            verified: false,
+            relevantSolutions: [],
+          })),
+      ),
+      technicalSignals: companyList.flatMap((c) =>
+        (c.technicalSignals ?? []).map((signal) => ({
+          companyId: c.id,
+          ...signal,
+        })),
+      ),
       personas: selectedIds.size
         ? personas.filter((persona) => selectedIds.has(persona.companyId))
         : personas,

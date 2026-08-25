@@ -84,7 +84,7 @@ export function AppShell({
         <div className="m-3 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-xs">
           <p className="font-semibold text-emerald-300">Integrações ativas</p>
           <p className="mt-1 text-slate-400">
-            Pesquisa pública com Tavily, OpenAI e Neon.
+            Pesquisa pública com Exa, OpenAI e Neon.
           </p>
         </div>
       )}

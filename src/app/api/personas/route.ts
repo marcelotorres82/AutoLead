@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
+import { leadReviewStatuses } from "@/lib/lead-domain";
 import { createPersona, listPersonas } from "@/lib/operations-repository";
 import { validOrigin } from "@/lib/security";
 
@@ -15,6 +16,7 @@ const personaSchema = z.object({
   priority: z.number().int().min(1).max(3),
   role: z.string().trim().min(2).max(80),
   notes: z.string().max(1000).optional(),
+  reviewStatus: z.enum(leadReviewStatuses).default("Pendente de validação"),
 });
 
 export async function GET() {

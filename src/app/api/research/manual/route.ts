@@ -11,6 +11,7 @@ export const maxDuration = 60;
 
 const requestSchema = z.object({
   query: z.string().trim().min(5).max(300),
+  forceRefresh: z.boolean().optional().default(false),
 });
 
 export async function POST(request: Request) {
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
         date,
         `manual-${crypto.randomUUID()}`,
         parsed.data.query,
+        parsed.data.forceRefresh,
       );
       console.log(
         JSON.stringify({
@@ -55,6 +57,8 @@ export async function POST(request: Request) {
         demoMode,
         `manual-${Date.now()}`,
         parsed.data.query,
+        undefined,
+        parsed.data.forceRefresh,
       ),
     );
   } catch (error) {

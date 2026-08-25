@@ -56,6 +56,9 @@ export function VerticalsClient({
                 <p className="text-xs text-slate-500">
                   {vertical.description ?? "Vertical configurável"}
                 </p>
+                <p className="mt-2 max-w-sm text-xs leading-5 text-slate-600 dark:text-slate-300">
+                  {vertical.subverticals.join(" · ")}
+                </p>
               </div>
               <Button
                 size="sm"

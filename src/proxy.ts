@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifySession, sessionCookie } from "@/lib/auth";
-const publicPaths = ["/login", "/api/auth/login"];
+const publicPaths = [
+  "/login",
+  "/api/auth/login",
+  "/api/telegram/webhook",
+];
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   if (

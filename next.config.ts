@@ -39,7 +39,7 @@ const nextConfig: NextConfig = {
           {
             key: "Content-Security-Policy",
             value:
-              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.tavily.com https://api.openai.com https://*.neon.tech https://*.vercel-storage.com https://*.vercel-insights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.exa.ai https://api.telegram.org https://api.openai.com https://*.neon.tech https://*.vercel-storage.com https://*.vercel-insights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
           },
         ],
       },

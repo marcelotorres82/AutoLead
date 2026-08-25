@@ -13,6 +13,7 @@ export async function enqueueResearch(
   date: string,
   kind: string,
   criteria?: string,
+  forceRefresh = false,
 ) {
   const created = await createResearchRun(date, kind, criteria);
   if (!created.created) return created.run;
@@ -22,6 +23,7 @@ export async function enqueueResearch(
       date,
       kind,
       criteria,
+      forceRefresh,
     ]);
     await updateResearchRunMetadata(created.run.id, {
       workflowRunId: workflow.runId,
