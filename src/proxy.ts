@@ -4,7 +4,6 @@ const publicPaths = [
   "/login",
   "/api/auth/login",
   "/api/telegram/webhook",
-  "/api/integration-health",
 ];
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
