@@ -5,6 +5,7 @@ import {
   findDuplicate,
   normalizeDomain,
   normalizeName,
+  nameSimilarity,
   lushaMetrics,
   countsTowardGoal,
   aiBatchResultSchema,
@@ -12,6 +13,9 @@ import {
   verifiedLinkedInCompanyUrl,
   extractEmployeeLimit,
   extractEmployeeUpperBound,
+  isForbiddenSectorCompany,
+  isValidVerticalClassification,
+  verticalNames,
 } from "@/lib/domain";
 import { demoCompanies } from "@/lib/demo-data";
 describe("normalização", () => {
@@ -21,6 +25,10 @@ describe("normalização", () => {
     ));
   it("normaliza nome e razão social", () =>
     expect(normalizeName("Árvore Digital Ltda.")).toBe("arvore digital"));
+  it("identifica variações de nome por similaridade conservadora", () =>
+    expect(
+      nameSimilarity("Companhia Digital Brasil", "Compania Digital Brasil"),
+    ).toBeGreaterThanOrEqual(0.85));
 });
 describe("score", () =>
   it("soma componentes validados", () =>
@@ -52,6 +60,22 @@ describe("IA", () => {
     expect(
       JSON.stringify(zodTextFormat(aiBatchAnalysisSchema, "batch")),
     ).not.toContain('"format":"uri"'));
+});
+describe("taxonomia comercial", () => {
+  it("mantém as nove verticais configuradas", () => {
+    expect(verticalNames).toHaveLength(9);
+    expect(verticalNames).toContain("Video Media");
+  });
+
+  it("aceita somente pares exatos de vertical e subvertical", () => {
+    expect(isValidVerticalClassification("Retail", "Varejo e e-commerce")).toBe(
+      true,
+    );
+    expect(isValidVerticalClassification("Retail", "Logística")).toBe(false);
+    expect(isValidVerticalClassification("Healthcare", "Diagnósticos")).toBe(
+      false,
+    );
+  });
 });
 describe("LinkedIn", () => {
   it("aceita somente perfil empresarial HTTPS presente nas fontes", () => {
@@ -89,3 +113,81 @@ describe("Lusha", () =>
       remaining: 40,
       alert: 85,
     })));
+
+describe("Validação de Core Business e Exclusão de Setores", () => {
+  it("rejeita explicitamente empresas do setor financeiro, adquirentes e bancos", () => {
+    const stone = isForbiddenSectorCompany({
+      name: "Stone Pagamentos S.A.",
+      coreBusiness:
+        "Adquirência, maquininhas de cartão e soluções de pagamento para lojistas",
+    });
+    expect(stone.forbidden).toBe(true);
+
+    const nubank = isForbiddenSectorCompany({
+      name: "Nubank",
+      coreBusiness: "Serviços de banco digital e cartão de crédito",
+    });
+    expect(nubank.forbidden).toBe(true);
+
+    const picpay = isForbiddenSectorCompany({
+      name: "PicPay",
+      coreBusiness: "Carteira digital, pagamentos PIX e marketplace financeiro",
+    });
+    expect(picpay.forbidden).toBe(true);
+  });
+
+  it("rejeita indústrias pesadas, hospitais e operadoras de telefonia", () => {
+    const hospital = isForbiddenSectorCompany({
+      name: "Laboratório Fleury",
+      coreBusiness: "Medicina diagnóstica e análises clínicas",
+    });
+    expect(hospital.forbidden).toBe(true);
+
+    const gerdau = isForbiddenSectorCompany({
+      name: "Gerdau S.A.",
+      coreBusiness: "Produção de aço e siderurgia",
+    });
+    expect(gerdau.forbidden).toBe(true);
+  });
+
+  it("aprova varejo legítimo e rejeita consultorias de tecnologia", () => {
+    const retail = isForbiddenSectorCompany({
+      name: "Magalu Digital",
+      tradeName: "Magalu",
+      coreBusiness:
+        "Comércio varejista omnichannel e venda de bens de consumo pela internet",
+    });
+    expect(retail.forbidden).toBe(false);
+
+    const itConsulting = isForbiddenSectorCompany({
+      name: "CI&T Software",
+      coreBusiness:
+        "Desenvolvimento e consultoria especializada em engenharia de software e transformação digital",
+    });
+    expect(itConsulting.forbidden).toBe(true);
+  });
+
+  it("rejeita Globant, Claranet e Thoughtworks pelo core business", () => {
+    for (const company of [
+      {
+        name: "Globant Brasil",
+        coreBusiness:
+          "Consultoria de tecnologia focada em inovação, transformação digital e engenharia de software",
+      },
+      {
+        name: "Claranet Brasil",
+        coreBusiness:
+          "Provedora de serviços gerenciados de TI, conectividade e nuvem",
+      },
+      {
+        name: "Thoughtworks Brasil",
+        coreBusiness:
+          "Consultoria global de tecnologia e serviços de engenharia de software",
+      },
+    ]) {
+      expect(isForbiddenSectorCompany(company)).toMatchObject({
+        forbidden: true,
+      });
+    }
+  });
+});

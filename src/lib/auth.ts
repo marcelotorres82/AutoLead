@@ -32,12 +32,14 @@ export async function requireSession() {
   return session;
 }
 export async function verifyCredentials(email: string, password: string) {
-  if (!env.ADMIN_EMAIL || !env.ADMIN_PASSWORD_HASH)
-    return (
-      process.env.NODE_ENV !== "production" &&
-      email === "demo@prospectradar.local" &&
-      password === "demo1234"
-    );
+  const isDemoLogin =
+    process.env.NODE_ENV !== "production" &&
+    email === "demo@prospectradar.local" &&
+    password === "demo1234";
+
+  if (isDemoLogin) return true;
+  if (!env.ADMIN_EMAIL || !env.ADMIN_PASSWORD_HASH) return false;
+
   return (
     email.toLowerCase() === env.ADMIN_EMAIL.toLowerCase() &&
     (await compare(password, env.ADMIN_PASSWORD_HASH))

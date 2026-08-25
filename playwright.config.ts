@@ -11,6 +11,16 @@ export default defineConfig({
     command: "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
+    env: {
+      DATABASE_URL: "",
+      EXA_API_KEY: "",
+      GEMINI_API_KEY: "",
+      ANTHROPIC_API_KEY: "",
+      OPENAI_API_KEY: "",
+      ADMIN_EMAIL: "",
+      ADMIN_PASSWORD_HASH: "",
+      AUTH_SECRET: "",
+    },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

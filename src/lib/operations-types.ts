@@ -4,6 +4,14 @@ export type Persona = {
   title: string;
   companyId: string;
   profileUrl?: string;
+  sourceUrl?: string;
+  sourceTitle?: string;
+  evidence?: string;
+  confidence?: number;
+  employmentStatus?: string;
+  reviewStatus: import("@/lib/lead-domain").LeadReviewStatus;
+  originRunId?: string;
+  researchedAt?: string;
   seniority: string;
   area: string;
   solution: string;
@@ -19,4 +27,5 @@ export type VerticalView = {
   name: string;
   description?: string;
   active: boolean;
+  subverticals: readonly string[];
 };

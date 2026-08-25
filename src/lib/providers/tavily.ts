@@ -1,4 +1,3 @@
-import { env } from "@/lib/env";
 import { assertSafePublicUrl } from "@/lib/security";
 import type { SearchResult, WebSearchProvider } from "@/lib/providers/types";
 import { z } from "zod";
@@ -15,7 +14,8 @@ const responseSchema = z.object({
 export class TavilySearchProvider implements WebSearchProvider {
   readonly name = "tavily";
   async search(query: string, limit = 10): Promise<SearchResult[]> {
-    if (!env.TAVILY_API_KEY) throw new Error("TAVILY_API_KEY não configurada");
+    const apiKey = process.env.TAVILY_API_KEY;
+    if (!apiKey) throw new Error("TAVILY_API_KEY não configurada");
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15_000);
     try {
@@ -23,12 +23,14 @@ export class TavilySearchProvider implements WebSearchProvider {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          authorization: `Bearer ${env.TAVILY_API_KEY}`,
+          authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           query,
           max_results: Math.min(limit, 20),
           search_depth: "advanced",
+          chunks_per_source: 3,
+          country: "brazil",
         }),
         signal: controller.signal,
       });
@@ -40,6 +42,7 @@ export class TavilySearchProvider implements WebSearchProvider {
           url: assertSafePublicUrl(item.url).toString(),
           content: item.content,
           publishedAt: item.published_date ?? undefined,
+          provider: this.name,
         }));
     } finally {
       clearTimeout(timer);

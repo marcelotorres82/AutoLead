@@ -5,7 +5,8 @@ export async function researchWorkflow(
   date: string,
   kind: string,
   criteria?: string,
+  forceRefresh = false,
 ) {
   "use workflow";
-  return executeResearchStep(runId, date, kind, criteria);
+  return executeResearchStep(runId, date, kind, criteria, forceRefresh);
 }

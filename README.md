@@ -6,9 +6,14 @@ Aplicação web single-user para pesquisar, triar e priorizar empresas antes da 
 
 - Next.js 16 (App Router), React 19, TypeScript strict, Tailwind CSS 4, componentes shadcn/ui/Radix e Lucide.
 - Neon Postgres via `@neondatabase/serverless`, Drizzle ORM/Kit e migrations versionadas.
-- Tavily para pesquisa pública e Gemini (principal) ou OpenAI (fallback) para análise estruturada validada por Zod.
+- Exa para pesquisa pública e Gemini, Anthropic ou OpenAI para análise estruturada validada por Zod.
+- Taxonomia fechada de nove verticais e suas subverticais, classificada pelo core business com fonte e justificativa obrigatórias.
 - Vercel Blob privado para backups JSON; Vercel Cron para pesquisa nos dias úteis.
 - Vitest para domínio e Playwright para fluxos essenciais.
+- Pipeline evidence-first com sinais técnicos determinísticos, scores independentes, evidence gate, fila diária e cooldown de 90 dias.
+- Telegram Bot API via webhook para consultas, pesquisas e notificações.
+
+A documentação do Prospect Radar 2.0 está em `docs/architecture.md`, `docs/research-pipeline.md`, `docs/scoring.md`, `docs/evidence-model.md`, `docs/providers.md`, `docs/deployment.md` e no plano incremental `docs/prospect-radar-2-migration-plan.md`.
 
 Server Components fazem leituras; mutações interativas usam endpoints/ações autenticados; integrações ficam em adaptadores de servidor (`src/lib/providers`). `getDb()` inicializa Neon de forma lazy, portanto o build não depende de `DATABASE_URL`. Sem segredos, o app funciona com empresas e fontes fictícias claramente marcadas.
 
@@ -27,20 +32,26 @@ Abra `http://localhost:3000`. Em desenvolvimento sem autenticação configurada,
 
 ## Variáveis de ambiente
 
-| Variável                | Uso                                            |
-| ----------------------- | ---------------------------------------------- |
-| `DATABASE_URL`          | String de conexão Neon (somente servidor)      |
-| `TAVILY_API_KEY`        | Busca pública                                  |
-| `GEMINI_API_KEY`        | Análise estruturada principal                  |
-| `GEMINI_MODEL`          | Modelo, padrão `gemini-3.1-flash-lite`         |
-| `OPENAI_API_KEY`        | Fallback opcional para análise                 |
-| `OPENAI_MODEL`          | Modelo OpenAI, padrão `gpt-5-mini`             |
-| `CRON_SECRET`           | Segredo aleatório com pelo menos 24 caracteres |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob privado                            |
-| `AUTH_SECRET`           | Segredo de sessão com pelo menos 32 caracteres |
-| `ADMIN_EMAIL`           | E-mail administrativo                          |
-| `ADMIN_PASSWORD_HASH`   | Hash bcrypt; nunca senha pura                  |
-| `NEXT_PUBLIC_APP_URL`   | Origem canônica, sem barra final               |
+| Variável                  | Uso                                                           |
+| ------------------------- | ------------------------------------------------------------- |
+| `DATABASE_URL`            | String de conexão Neon (somente servidor)                     |
+| `EXA_API_KEY`             | Busca pública                                                 |
+| `GEMINI_API_KEY`          | Análise estruturada principal                                 |
+| `GEMINI_MODEL`            | Modelo, padrão `gemini-3.1-flash-lite`                        |
+| `OPENAI_API_KEY`          | Fallback opcional para análise                                |
+| `OPENAI_MODEL`            | Modelo OpenAI, padrão `gpt-5-mini`                            |
+| `LLM_PROVIDER`            | Provider preferido: `auto`, `gemini`, `anthropic` ou `openai` |
+| `LLM_MODEL`               | Override opcional do modelo do provider escolhido             |
+| `RESEARCH_DEBUG`          | Logs estruturados de diagnóstico, sem secrets                 |
+| `CRON_SECRET`             | Segredo aleatório com pelo menos 24 caracteres                |
+| `BLOB_READ_WRITE_TOKEN`   | Vercel Blob privado                                           |
+| `AUTH_SECRET`             | Segredo de sessão com pelo menos 32 caracteres                |
+| `ADMIN_EMAIL`             | E-mail administrativo                                         |
+| `ADMIN_PASSWORD_HASH`     | Hash bcrypt; nunca senha pura                                 |
+| `TELEGRAM_BOT_TOKEN`      | Token fornecido pelo BotFather (servidor)                     |
+| `TELEGRAM_CHAT_ID`        | Chat privado autorizado a usar o bot                          |
+| `TELEGRAM_WEBHOOK_SECRET` | Segredo enviado pelo Telegram ao webhook                      |
+| `NEXT_PUBLIC_APP_URL`     | Origem canônica, sem barra final                              |
 
 Gere segredos com `openssl rand -base64 32`. Gere o hash da senha:
 
@@ -58,17 +69,29 @@ npm run db:migrate
 npm run db:seed
 ```
 
-O seed é idempotente: cadastra as oito verticais, metas 30/150, limites operacionais e o mês atual do controle Lusha.
+O seed é idempotente: cadastra as nove verticais e suas subverticais oficiais, metas 30/150, limites operacionais e o mês atual do controle Lusha. Rode-o novamente após atualizar uma instalação existente para incluir `Video Media` e atualizar as descrições da taxonomia.
 
-## Tavily, Gemini, OpenAI e Blob
+## Exa, provedores de IA e Blob
 
 Crie chaves nos painéis dos provedores e salve-as exclusivamente nas variáveis de servidor da Vercel. Gemini é usado primeiro; OpenAI fica como fallback opcional. Para Blob, instale Vercel Blob no Marketplace/Storage, selecione acesso privado e conecte o store ao projeto. Nunca prefixe essas chaves com `NEXT_PUBLIC_`.
 
 Sem qualquer uma das integrações principais, o banner de demonstração permanece ativo e chamadas reais são desabilitadas com orientação na tela.
 
+## Pesquisa de leads nas empresas aprovadas
+
+Depois de mudar uma empresa para `Aprovada para pesquisar leads`, selecione até cinco contas na tabela e use **Leads**. Cada empresa inicia um workflow independente com consultas Exa complementares: cargos e liderança, perfis públicos indexados do LinkedIn, página institucional da equipe e movimentações profissionais recentes. O limite por lote contém o consumo da franquia já configurada.
+
+O fluxo não acessa uma sessão do LinkedIn, não automatiza Sales Navigator e não coleta e-mail ou telefone. A IA só pode criar candidatos apoiados por URLs retornadas na pesquisa, limita a confiança quando o vínculo é provável ou incerto e salva tudo como `Pendente de validação`. Na tela Personas, confirme cargo e empresa atual manualmente — idealmente no Sales Navigator —, aprove ou descarte e somente então consulte o Lusha manualmente quando fizer sentido.
+
+Resultados repetidos são comparados por URL de perfil ou pela combinação nome + cargo dentro da mesma empresa. Assim, uma nova pesquisa reaproveita o histórico sem eliminar homônimos que ocupem funções diferentes.
+
 ## Pesquisa diária e Cron
 
 `vercel.json` agenda `GET /api/cron/daily-research` com `0 10 * * 1-5`. Cron usa UTC: 10:00 UTC corresponde a 07:00 em Brasília quando UTC-3. O endpoint exige `Authorization: Bearer ${CRON_SECRET}` e usa data de Brasília como chave de idempotência. A estratégia prevista é busca ampla por vertical, normalização/deduplicação, análise em lote e enriquecimento sob demanda — não 30 análises profundas dentro da mesma função.
+
+A classificação considera a principal fonte de receita ou missão institucional. Canal digital, e-commerce, aplicativo ou portal secundário não altera a vertical. A persistência rejeita pares vertical/subvertical fora da taxonomia e exige uma fonte retornada pela busca para comprovar o core business; não há fallback automático para `Other Media`.
+
+Antes de analisar as fontes, o fluxo envia à IA o inventário de nomes, nomes fantasia, aliases e domínios já persistidos. Os resultados das consultas são intercalados por posição, normalizados por URL e limitados por domínio antes do corte de contexto, evitando que as primeiras verticais ou um único portal ocupem toda a análise.
 
 Teste manualmente:
 
@@ -77,6 +100,18 @@ curl -H "Authorization: Bearer SEU_CRON_SECRET" http://localhost:3000/api/cron/d
 ```
 
 Confira no plano Vercel escolhido a disponibilidade e precisão do Cron e o limite de duração de Functions. O handler declara Node.js runtime e `maxDuration = 60`; planos e limites mudam, então valide no painel antes do deploy.
+
+## Telegram
+
+Crie um bot com o `@BotFather`, envie uma primeira mensagem para ele e descubra o seu `chat.id` com `getUpdates`. Configure as três variáveis `TELEGRAM_*` na Vercel e registre o webhook após o deploy:
+
+```bash
+curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d "{\"url\":\"https://SEU_DOMINIO/api/telegram/webhook\",\"secret_token\":\"$TELEGRAM_WEBHOOK_SECRET\",\"allowed_updates\":[\"message\"],\"drop_pending_updates\":true}"
+```
+
+Comandos disponíveis: `/empresas 10`, `/vertical Retail 10`, `/verticais`, `/pesquisar geral`, `/pesquisar Retail` e `/ajuda`. Somente o `TELEGRAM_CHAT_ID` configurado é aceito. Pesquisas rodam no workflow durável e o bot envia os nomes das novas empresas quando a execução termina.
 
 ## Exportação, backup e restauração
 
@@ -89,7 +124,7 @@ Confira no plano Vercel escolhido a disponibilidade e precisão do Cron e o limi
 
 Sessões são JWT assinadas em cookie HTTP-only, `sameSite=lax` e `secure` em produção. Login possui rate limit em memória (troque por store compartilhado em escala horizontal), verificação de origem e bcrypt custo 12. CSP e headers de segurança são configurados em `next.config.ts`. Adaptadores externos têm timeout, validação Zod e bloqueio básico de SSRF/protocolos/IPs privados. Não são registrados segredos, sessões ou cabeçalhos sensíveis.
 
-Não faça scraping/login/navegação automática no LinkedIn, não solicite credenciais corporativas e não use a aplicação para port scanning, pentest ou alegações de vulnerabilidade. URLs de perfil e estados de Salesforce/Lusha/SalesLoft são campos manuais e pessoais, sem sincronização.
+Não faça scraping/login/navegação automática no LinkedIn, não solicite credenciais corporativas e não use a aplicação para port scanning, pentest ou alegações de vulnerabilidade. A pesquisa de pessoas aceita apenas URLs públicas já indexadas pelo Exa; a validação em Sales Navigator e o uso de Lusha continuam manuais, sem sincronização.
 
 ## Qualidade
 
@@ -126,7 +161,7 @@ npx vercel deploy --prebuilt --prod
 - Build sem banco: confirme que nenhum módulo chama `neon()` no topo; use apenas `getDb()`.
 - Tela em modo demo: consulte Configurações; faltam uma ou mais variáveis.
 - Cron 401: `CRON_SECRET` do projeto e header não coincidem.
-- Falha Tavily/OpenAI: verifique chave, quota e logs da execução; o app mantém estado vazio e permite retry.
+- Falha Exa/IA: verifique chave, quota e logs da execução; o app mantém estado vazio e permite retry.
 - Excel exibe acentos incorretos: baixe pelo endpoint CSV, que inclui BOM UTF-8.
 - Horário deslocado: o schedule é UTC, enquanto a chave diária usa `America/Sao_Paulo`.
 
@@ -136,7 +171,7 @@ npx vercel deploy --prebuilt --prod
 src/app/                 páginas, layouts e Route Handlers
 src/components/          design system, shell e estado demo
 src/db/                  schema Drizzle e conexão Neon lazy
-src/lib/providers/       interfaces e adaptadores Tavily/OpenAI/Blob
+src/lib/providers/       interfaces e adaptadores Exa/IA/Telegram/Blob
 src/lib/                 domínio, autenticação, CSV, backup e segurança
 drizzle/                 migrations SQL versionadas
 scripts/                 migration, seed e hash bcrypt

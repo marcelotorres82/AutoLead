@@ -8,6 +8,7 @@ import {
   Linkedin,
   Pause,
   Trash2,
+  UserSearch,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useDemoStore } from "@/components/demo-store";
@@ -15,13 +16,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { CompanyStatus } from "@/lib/domain";
+import { scoreLabel } from "@/lib/evidence-intelligence";
 export function CompanyTable() {
-  const { companies, updateStatus } = useDemoStore();
+  const { companies, updateStatus, enqueueLeadResearch } = useDemoStore();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Todos");
   const [min, setMin] = useState(0);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [leadSearchPending, setLeadSearchPending] = useState(false);
   const filtered = useMemo(
     () =>
       companies.filter(
@@ -40,6 +43,16 @@ export function CompanyTable() {
     (safePage - 1) * pageSize,
     safePage * pageSize,
   );
+  const selectedCompanies = useMemo(
+    () => companies.filter((company) => selected.has(company.id)),
+    [companies, selected],
+  );
+  const canResearchLeads =
+    selectedCompanies.length > 0 &&
+    selectedCompanies.length <= 5 &&
+    selectedCompanies.every(
+      (company) => company.status === "Aprovada para pesquisar leads",
+    );
   const change = async (id: string, value: CompanyStatus) => {
     try {
       await updateStatus(id, value);
@@ -92,21 +105,64 @@ export function CompanyTable() {
           />
           <strong>{min}</strong>
         </label>
-        {selected.size ? (
-          <Button asChild variant="outline">
-            <a href={`/api/export/csv?ids=${Array.from(selected).join(",")}`}>
-              <Download className="size-4" />
-              Exportar {selected.size} selecionadas
-            </a>
+        <div className="flex gap-2">
+          {selected.size ? (
+            <Button asChild variant="outline" className="flex-1">
+              <a href={`/api/export/csv?ids=${Array.from(selected).join(",")}`}>
+                <Download className="size-4" />
+                Exportar {selected.size}
+              </a>
+            </Button>
+          ) : (
+            <Button disabled variant="outline" className="flex-1">
+              <Download className="size-4" /> Exportar
+            </Button>
+          )}
+          <Button
+            className="flex-1"
+            disabled={!canResearchLeads || leadSearchPending}
+            title={
+              selectedCompanies.length > 5
+                ? "Selecione no máximo 5 empresas"
+                : selectedCompanies.some(
+                      (company) =>
+                        company.status !== "Aprovada para pesquisar leads",
+                    )
+                  ? "Aprove todas as empresas selecionadas antes da pesquisa"
+                  : "Pesquisar decisores nas empresas selecionadas"
+            }
+            onClick={async () => {
+              const confirmed = window.confirm(
+                `Pesquisar leads em ${selectedCompanies.length} empresa${selectedCompanies.length === 1 ? "" : "s"}? Serão feitas 4 consultas Exa por empresa, usando apenas o plano já configurado.`,
+              );
+              if (!confirmed) return;
+              setLeadSearchPending(true);
+              try {
+                const runs = await enqueueLeadResearch(
+                  selectedCompanies.map((company) => company.id),
+                );
+                toast.success(
+                  `${runs.length} pesquisa${runs.length === 1 ? "" : "s"} de leads iniciada${runs.length === 1 ? "" : "s"}`,
+                );
+                setSelected(new Set());
+              } catch (error) {
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : "Falha ao iniciar pesquisa de leads",
+                );
+              } finally {
+                setLeadSearchPending(false);
+              }
+            }}
+          >
+            <UserSearch className="size-4" />
+            Leads
           </Button>
-        ) : (
-          <Button disabled variant="outline">
-            <Download className="size-4" /> Selecione para exportar
-          </Button>
-        )}
+        </div>
       </div>
       <div className="overflow-x-auto rounded-xl border bg-white dark:bg-slate-900">
-        <table className="w-full min-w-[1000px] text-left text-sm">
+        <table className="w-full min-w-[1320px] text-left text-sm">
           <thead className="border-b bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800">
             <tr>
               <th className="p-4">
@@ -136,7 +192,11 @@ export function CompanyTable() {
               <th className="p-4">Vertical</th>
               <th className="p-4">LinkedIn</th>
               <th className="p-4">Solução</th>
-              <th className="p-4">Score</th>
+              <th className="p-4">Opportunity</th>
+              <th className="p-4">Confidence</th>
+              <th className="p-4">WAAP</th>
+              <th className="p-4">API Sec</th>
+              <th className="p-4">Guardicore</th>
               <th className="p-4">Status</th>
               <th className="p-4 text-right">Ações rápidas</th>
             </tr>
@@ -190,7 +250,10 @@ export function CompanyTable() {
                     </p>
                   ) : null}
                 </td>
-                <td className="p-4">{c.vertical}</td>
+                <td className="p-4">
+                  <span>{c.vertical}</span>
+                  <p className="mt-1 text-xs text-slate-500">{c.subsegment}</p>
+                </td>
                 <td className="p-4">
                   {c.linkedinUrl ? (
                     <a
@@ -210,11 +273,37 @@ export function CompanyTable() {
                   <Badge>{c.solution}</Badge>
                 </td>
                 <td className="p-4">
-                  <strong>{c.score}</strong>
-                  <span className="text-slate-400">/100</span>
+                  <strong>{c.opportunityScore ?? c.score}</strong>
+                  <p className="text-xs text-slate-500">
+                    {scoreLabel(c.opportunityScore ?? c.score)}
+                  </p>
                 </td>
                 <td className="p-4">
-                  <Badge>{c.status}</Badge>
+                  <strong>{c.confidenceScore ?? 0}</strong>
+                  <p className="text-xs text-slate-500">
+                    {scoreLabel(c.confidenceScore ?? 0)}
+                  </p>
+                </td>
+                <td className="p-4">
+                  <strong>{c.waapScore}</strong>
+                  <p className="text-xs text-slate-500">
+                    {scoreLabel(c.waapScore)}
+                  </p>
+                </td>
+                <td className="p-4">
+                  <strong>{c.apiScore}</strong>
+                  <p className="text-xs text-slate-500">
+                    {scoreLabel(c.apiScore)}
+                  </p>
+                </td>
+                <td className="p-4">
+                  <strong>{c.guardicoreScore}</strong>
+                  <p className="text-xs text-slate-500">
+                    {scoreLabel(c.guardicoreScore)}
+                  </p>
+                </td>
+                <td className="p-4">
+                  <Badge>{c.qualificationStatus ?? c.status}</Badge>
                 </td>
                 <td className="p-4">
                   <div className="flex justify-end gap-1">

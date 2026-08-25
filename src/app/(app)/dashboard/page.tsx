@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -20,10 +20,31 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { countsTowardGoal, dateInSaoPaulo, lushaMetrics } from "@/lib/domain";
+import { scoreLabel } from "@/lib/evidence-intelligence";
 export default function Dashboard() {
   const { companies, lushaUsed, generate, demoMode } = useDemoStore();
   const [isResearching, setIsResearching] = useState(false);
   const [referenceDate] = useState(() => new Date());
+  const [dailyQueue, setDailyQueue] = useState<
+    Array<{ id: string; companyId: string; status: string }>
+  >([]);
+  useEffect(() => {
+    if (demoMode) return;
+    const controller = new AbortController();
+    void fetch("/api/daily-queue", {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((response) => (response.ok ? response.json() : { queue: [] }))
+      .then((result) =>
+        setDailyQueue(Array.isArray(result.queue) ? result.queue : []),
+      )
+      .catch((error) => {
+        if (error instanceof Error && error.name !== "AbortError")
+          toast.error("Não foi possível carregar a fila diária");
+      });
+    return () => controller.abort();
+  }, [demoMode]);
   const today = dateInSaoPaulo(referenceDate);
   const weekStart = dateInSaoPaulo(
     new Date(referenceDate.getTime() - 6 * 86_400_000),
@@ -71,6 +92,46 @@ export default function Dashboard() {
       style: "text-cyan-600 bg-cyan-50",
     },
   ];
+  const queueByCompany = new Map(
+    dailyQueue.map((item) => [item.companyId, item]),
+  );
+  const companiesById = new Map(
+    companies.map((company) => [company.id, company]),
+  );
+  const radarCompanies = dailyQueue.length
+    ? dailyQueue
+        .map((item) => companiesById.get(item.companyId))
+        .filter((company): company is (typeof companies)[number] =>
+          Boolean(company),
+        )
+    : companies
+        .filter((company) =>
+          demoMode ? true : company.qualificationStatus === "READY",
+        )
+        .slice()
+        .sort(
+          (a, b) =>
+            (b.opportunityScore ?? b.score) - (a.opportunityScore ?? a.score),
+        )
+        .slice(0, 30);
+  async function updateQueueStatus(
+    queueId: string,
+    status: "CLAIMED" | "CONTACTED",
+  ) {
+    const response = await fetch(`/api/daily-queue/${queueId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        status,
+        actor: "SDR",
+        outcome: status === "CONTACTED" ? "CONTACT_ATTEMPTED" : undefined,
+      }),
+    });
+    if (!response.ok) throw new Error("Não foi possível atualizar a fila");
+    setDailyQueue((items) =>
+      items.map((item) => (item.id === queueId ? { ...item, status } : item)),
+    );
+  }
   return (
     <>
       <PageHeading
@@ -111,7 +172,7 @@ export default function Dashboard() {
       ) : (
         <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
           <strong>Pesquisa pública ativa.</strong> Resultados são fundamentados
-          em fontes Tavily, analisados pelo provedor de IA configurado e
+          em fontes Exa, analisados pelo provedor de IA configurado e
           persistidos no Neon.
         </div>
       )}
@@ -188,34 +249,89 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-      <div className="mt-5 grid gap-5 xl:grid-cols-2">
+      <div className="mt-5 grid gap-5">
         <Card>
           <CardHeader>
-            <CardTitle>Empresas com maior score</CardTitle>
+            <CardTitle>Radar do Dia</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {companies
-              .slice()
-              .sort((a, b) => b.score - a.score)
-              .slice(0, 4)
-              .map((c) => (
-                <Link
-                  key={c.id}
-                  href={`/companies/${c.id}`}
-                  className="flex items-center justify-between rounded-lg border p-3 hover:bg-slate-50 dark:hover:bg-slate-800"
-                >
-                  <div>
-                    <p className="text-sm font-semibold">{c.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {c.vertical} · {c.solution}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge>{c.score}/100</Badge>
-                    <ArrowRight className="size-4" />
-                  </div>
-                </Link>
-              ))}
+          <CardContent className="overflow-x-auto">
+            <table className="w-full min-w-[1050px] text-left text-sm">
+              <thead className="border-b text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="p-3">Empresa</th>
+                  <th className="p-3">Vertical</th>
+                  <th className="p-3">Opportunity</th>
+                  <th className="p-3">Confidence</th>
+                  <th className="p-3">WAAP</th>
+                  <th className="p-3">API Sec</th>
+                  <th className="p-3">Guardicore</th>
+                  <th className="p-3">Solução</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {radarCompanies.map((c) => (
+                  <tr key={c.id} className="border-b last:border-0">
+                    <td className="p-3 font-semibold">{c.name}</td>
+                    <td className="p-3">{c.vertical}</td>
+                    <td className="p-3">
+                      {c.opportunityScore ?? c.score}
+                      <span className="ml-1 text-xs text-slate-500">
+                        {scoreLabel(c.opportunityScore ?? c.score)}
+                      </span>
+                    </td>
+                    <td className="p-3">{c.confidenceScore ?? 0}</td>
+                    <td className="p-3">{c.waapScore}</td>
+                    <td className="p-3">{c.apiScore}</td>
+                    <td className="p-3">{c.guardicoreScore}</td>
+                    <td className="p-3">
+                      <Badge>{c.solution}</Badge>
+                    </td>
+                    <td className="p-3">
+                      <Badge>{c.qualificationStatus ?? "DEMO"}</Badge>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex gap-1">
+                        <Button asChild size="sm" variant="ghost">
+                          <Link href={`/companies/${c.id}`}>
+                            Abrir <ArrowRight className="size-4" />
+                          </Link>
+                        </Button>
+                        {queueByCompany.get(c.id)?.status === "READY" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              void updateQueueStatus(
+                                queueByCompany.get(c.id)!.id,
+                                "CLAIMED",
+                              ).catch((error) => toast.error(error.message))
+                            }
+                          >
+                            Assumir
+                          </Button>
+                        ) : null}
+                        {queueByCompany.get(c.id)?.status === "CLAIMED" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              void updateQueueStatus(
+                                queueByCompany.get(c.id)!.id,
+                                "CONTACTED",
+                              ).catch((error) => toast.error(error.message))
+                            }
+                          >
+                            Contatado
+                          </Button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </CardContent>
         </Card>
         <Card>
