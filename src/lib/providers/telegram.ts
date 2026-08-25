@@ -18,6 +18,49 @@ export function escapeTelegramHtml(value: string) {
     .replaceAll('"', "&quot;");
 }
 
+export function telegramWebhookUrl(appUrl: string) {
+  const webhookUrl = new URL("/api/telegram/webhook", appUrl);
+  if (webhookUrl.protocol !== "https:")
+    throw new Error("O webhook do Telegram exige uma URL HTTPS");
+  return webhookUrl.toString();
+}
+
+export async function registerTelegramWebhook() {
+  if (
+    !env.TELEGRAM_BOT_TOKEN ||
+    !env.TELEGRAM_CHAT_ID ||
+    !env.TELEGRAM_WEBHOOK_SECRET
+  )
+    throw new Error("Integração do Telegram incompleta");
+
+  const response = await fetch(
+    `${TELEGRAM_API}/bot${env.TELEGRAM_BOT_TOKEN}/setWebhook`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        url: telegramWebhookUrl(env.NEXT_PUBLIC_APP_URL),
+        secret_token: env.TELEGRAM_WEBHOOK_SECRET,
+        allowed_updates: ["message"],
+      }),
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+  const payload = (await response.json().catch(() => null)) as {
+    ok?: boolean;
+    description?: string;
+  } | null;
+  if (!response.ok || !payload?.ok)
+    throw new Error(
+      `Telegram retornou ${response.status}: ${payload?.description ?? "erro desconhecido"}`,
+    );
+
+  await sendTelegramMessage(
+    env.TELEGRAM_CHAT_ID,
+    "<b>Prospect Radar conectado</b> ✅\n\nUse /ajuda para ver os comandos disponíveis.",
+  );
+}
+
 export async function sendTelegramMessage(
   chatId: string,
   text: string,

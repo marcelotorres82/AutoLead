@@ -1,15 +1,40 @@
+import { CheckCircle2, CircleAlert } from "lucide-react";
 import { PageHeading } from "@/components/page-heading";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { integrationStatus } from "@/lib/env";
-export default function SettingsPage() {
+import { registerTelegramWebhookAction } from "@/app/(app)/settings/actions";
+
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ telegram?: string }>;
+}) {
   const status = integrationStatus();
+  const telegramResult = (await searchParams).telegram;
   return (
     <>
       <PageHeading
         title="Configurações"
         description="Metas, limites de custo e estado das integrações de servidor."
       />
+      {telegramResult === "connected" ? (
+        <div className="mb-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+          <span>
+            Webhook registrado. O bot enviou uma confirmação no Telegram.
+          </span>
+        </div>
+      ) : telegramResult === "error" ? (
+        <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <CircleAlert className="mt-0.5 size-4 shrink-0" />
+          <span>
+            Não foi possível registrar o webhook. Confira as variáveis do
+            Telegram na Vercel e tente novamente.
+          </span>
+        </div>
+      ) : null}
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -56,6 +81,15 @@ export default function SettingsPage() {
               Chaves nunca são enviadas ao cliente. Consulte o README para
               configurar o ambiente.
             </p>
+            <form action={registerTelegramWebhookAction} className="pt-2">
+              <Button type="submit" disabled={!status.telegram}>
+                Conectar webhook do Telegram
+              </Button>
+              <p className="mt-2 text-xs text-slate-500">
+                Registra o endereço no Telegram usando as chaves diretamente no
+                servidor, sem expô-las no navegador.
+              </p>
+            </form>
           </CardContent>
         </Card>
       </div>
