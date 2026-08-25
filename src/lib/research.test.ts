@@ -22,6 +22,7 @@ describe("cron", () => {
     expect(queries).toContain(
       "empresas de e-commerce com até 1.000 funcionários Brasil site:linkedin.com/company",
     );
+    expect(queries[0]).toContain("operação no Brasil");
   });
   it("inclui as subverticais na pesquisa padrão", () => {
     expect(buildSearchQueries(undefined, ["Video Media"])[0]).toContain(

@@ -24,6 +24,7 @@ import {
   extractEmployeeLimit,
   extractEmployeeUpperBound,
   findDuplicate,
+  hasBrazilOperationEvidence,
   isForbiddenSectorCompany,
   isValidVerticalClassification,
   normalizeDomain,
@@ -429,10 +430,21 @@ export async function persistAnalyzedCompanies(
     const validEvidence = candidate.evidence.filter((item) =>
       resultByUrl.has(item.sourceUrl),
     );
+    const brazilOperationSource = resultByUrl.get(
+      candidate.brazilOperationSourceUrl,
+    );
+    const hasBrazilFact = candidate.evidence.some(
+      (item) =>
+        item.kind === "fact" &&
+        item.sourceUrl === candidate.brazilOperationSourceUrl,
+    );
     if (
       !domain ||
       !validEvidence.length ||
-      !resultByUrl.has(candidate.classificationSourceUrl)
+      !resultByUrl.has(candidate.classificationSourceUrl) ||
+      !brazilOperationSource ||
+      !hasBrazilFact ||
+      !hasBrazilOperationEvidence(candidate, brazilOperationSource)
     )
       continue;
     const breakdown = scoreBreakdownSchema.parse(candidate.breakdown);
@@ -498,7 +510,7 @@ export async function persistAnalyzedCompanies(
         subsegment: candidate.subsegment,
         city: candidate.city || null,
         state: candidate.state || null,
-        country: candidate.country,
+        country: "Brasil",
         size: candidate.size,
         employeeRange: candidate.employees || null,
         linkedinUrl: linkedinUrl ?? null,

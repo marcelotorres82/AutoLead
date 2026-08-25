@@ -41,10 +41,10 @@ export function buildSearchQueries(
 
   if (requested) {
     return [
-      `${requested} Brasil empresas`,
-      `${requested} Brasil site oficial empresa`,
+      `${requested} empresas com operação no Brasil`,
+      `${requested} "atua no Brasil" OR "opera no Brasil" site oficial`,
       `${requested} Brasil site:linkedin.com/company`,
-      `${requested} Brasil notícias vagas expansão`,
+      `${requested} Brasil escritório lojas vagas expansão`,
     ];
   }
 
@@ -58,7 +58,7 @@ export function buildSearchQueries(
           )
         : "";
 
-    const baseVertical = `Brasil ${vertical}${subverticals ? ` (${subverticals})` : ""}`;
+    const baseVertical = `empresas com operação no Brasil ${vertical}${subverticals ? ` (${subverticals})` : ""}`;
     const negFilter =
       '-banco -fintech -pagamento -adquirente -maquininha -telecom -operadora -ISP -"consultoria de TI" -"serviços gerenciados de TI" -"empresa de tecnologia" -"software house"';
 

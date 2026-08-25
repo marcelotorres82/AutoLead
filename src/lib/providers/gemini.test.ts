@@ -39,6 +39,10 @@ describe("Gemini", () => {
       classificationReason:
         "A descrição institucional apresenta publicidade e marketing como atividade principal.",
       classificationSourceUrl: "https://example.com/fonte",
+      operatesInBrazil: true as const,
+      brazilOperationEvidence:
+        "A empresa mantém operação comercial ativa em São Paulo, Brasil.",
+      brazilOperationSourceUrl: "https://example.com/fonte",
       city: "São Paulo",
       state: "SP",
       country: "Brasil",

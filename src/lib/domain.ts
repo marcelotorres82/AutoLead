@@ -220,6 +220,9 @@ export const analyzedCompanySchema = z.object({
   coreBusiness: z.string().min(20).max(600),
   classificationReason: z.string().min(20).max(600),
   classificationSourceUrl: z.string().min(8).max(2048),
+  operatesInBrazil: z.literal(true),
+  brazilOperationEvidence: z.string().min(20).max(600),
+  brazilOperationSourceUrl: z.string().min(8).max(2048),
   city: z.string().max(100),
   state: z.string().max(100),
   country: z.string().min(2).max(100),
@@ -283,6 +286,44 @@ export function normalizeName(value: string): string {
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
     .replace(/\s+/g, " ");
+}
+
+export function isBrazilCountry(value: string): boolean {
+  const normalized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+  return [
+    "brasil",
+    "brazil",
+    "republica federativa do brasil",
+    "federative republic of brazil",
+  ].includes(normalized);
+}
+
+const brazilOperationMarkerRegex =
+  /(?:\bbrasil\b|\bbrazil\b|brasileir[ao]s?|\bcnpj\b|\+55\b|acre|alagoas|amap[aá]|amazonas|bahia|cear[aá]|distrito federal|esp[ií]rito santo|goi[aá]s|maranh[aã]o|mato grosso|minas gerais|par[aá]|para[ií]ba|paran[aá]|pernambuco|piau[ií]|rio grande do (?:norte|sul)|rond[oô]nia|roraima|santa catarina|s[aã]o paulo|sergipe|tocantins|rio de janeiro|bras[ií]lia|belo horizonte|porto alegre|curitiba|recife|salvador|fortaleza|florian[oó]polis|goi[aâ]nia|manaus|bel[eé]m)/i;
+
+export function hasBrazilOperationEvidence(
+  candidate: {
+    operatesInBrazil?: boolean;
+    country?: string;
+    brazilOperationEvidence?: string;
+  },
+  source?: { title?: string; url?: string; content?: string },
+): boolean {
+  if (
+    candidate.operatesInBrazil !== true ||
+    !isBrazilCountry(candidate.country || "") ||
+    !candidate.brazilOperationEvidence
+  )
+    return false;
+
+  if (!source) return false;
+  return brazilOperationMarkerRegex.test(
+    [source.title, source.content].filter(Boolean).join(" "),
+  );
 }
 
 export function nameSimilarity(left: string, right: string) {

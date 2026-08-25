@@ -14,6 +14,8 @@ import {
   extractEmployeeLimit,
   extractEmployeeUpperBound,
   isForbiddenSectorCompany,
+  hasBrazilOperationEvidence,
+  isBrazilCountry,
   isValidVerticalClassification,
   verticalNames,
 } from "@/lib/domain";
@@ -75,6 +77,37 @@ describe("taxonomia comercial", () => {
     expect(isValidVerticalClassification("Healthcare", "Diagnósticos")).toBe(
       false,
     );
+  });
+});
+describe("atuação no Brasil", () => {
+  it("aceita somente país Brasil e evidência explícita de operação local", () => {
+    expect(isBrazilCountry("Brasil")).toBe(true);
+    expect(isBrazilCountry("Brazil")).toBe(true);
+    expect(isBrazilCountry("Argentina")).toBe(false);
+    expect(
+      hasBrazilOperationEvidence(
+        {
+          operatesInBrazil: true,
+          country: "Brasil",
+          brazilOperationEvidence:
+            "A empresa mantém escritório e operação comercial em São Paulo.",
+        },
+        { content: "Conheça nosso escritório de São Paulo, SP." },
+      ),
+    ).toBe(true);
+  });
+
+  it("rejeita empresa sem confirmação brasileira", () => {
+    expect(
+      hasBrazilOperationEvidence(
+        {
+          operatesInBrazil: true,
+          country: "México",
+          brazilOperationEvidence: "A empresa atende a América Latina.",
+        },
+        { content: "Operações no México, Chile e Colômbia." },
+      ),
+    ).toBe(false);
   });
 });
 describe("LinkedIn", () => {
