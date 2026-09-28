@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertSafePublicUrl, isPrivateHostname } from "@/lib/security";
+import { assertSafePublicUrl, isPrivateHostname, validOrigin } from "@/lib/security";
 
 describe("URL safety", () => {
   it.each([
@@ -27,5 +27,23 @@ describe("URL safety", () => {
   it("rejeita protocolo e rede privada", () => {
     expect(() => assertSafePublicUrl("ftp://example.com/file")).toThrow();
     expect(() => assertSafePublicUrl("http://172.20.0.1/admin")).toThrow();
+  });
+});
+
+describe("request origin validation", () => {
+  const requestUrl = "https://prospect-radar.vercel.app/api/companies";
+
+  it("accepts only the exact request origin", () => {
+    expect(validOrigin("https://prospect-radar.vercel.app", requestUrl)).toBe(true);
+    expect(validOrigin("http://localhost:3000", "http://localhost:3000/api/test")).toBe(true);
+  });
+
+  it.each([
+    null,
+    "https://attacker.vercel.app",
+    "https://prospect-radar.vercel.app.attacker.example",
+    "not a URL",
+  ])("rejects untrusted origin %s", (origin) => {
+    expect(validOrigin(origin, requestUrl)).toBe(false);
   });
 });
