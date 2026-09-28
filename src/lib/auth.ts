@@ -4,9 +4,13 @@ import { cookies } from "next/headers";
 import { env } from "@/lib/env";
 
 export const sessionCookie = "prospect-radar-session";
-const fallbackDemoSecret = "prospect-radar-demo-secret-local-only-32-chars";
-const secret = () =>
-  new TextEncoder().encode(env.AUTH_SECRET ?? fallbackDemoSecret);
+const secret = () => {
+  if (!env.AUTH_SECRET && process.env.NODE_ENV === "production")
+    throw new Error("AUTH_SECRET é obrigatório em produção");
+  return new TextEncoder().encode(
+    env.AUTH_SECRET ?? "prospect-radar-demo-secret-local-only-32-chars",
+  );
+};
 export async function createSession(email: string) {
   return new SignJWT({ email, role: "admin" })
     .setProtectedHeader({ alg: "HS256" })
