@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { assertSafePublicUrl, isPrivateHostname, validOrigin } from "@/lib/security";
+import {
+  assertSafePublicUrl,
+  isPrivateHostname,
+  validOrigin,
+} from "@/lib/security";
 
 describe("URL safety", () => {
   it.each([
@@ -34,8 +38,12 @@ describe("request origin validation", () => {
   const requestUrl = "https://prospect-radar.vercel.app/api/companies";
 
   it("accepts only the exact request origin", () => {
-    expect(validOrigin("https://prospect-radar.vercel.app", requestUrl)).toBe(true);
-    expect(validOrigin("http://localhost:3000", "http://localhost:3000/api/test")).toBe(true);
+    expect(
+      validOrigin("https://prospect-radar.vercel.app", requestUrl),
+    ).toBe(true);
+    expect(
+      validOrigin("http://localhost:3000", "http://localhost:3000/api/test"),
+    ).toBe(true);
   });
 
   it.each([
