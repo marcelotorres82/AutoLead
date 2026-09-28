@@ -10,7 +10,7 @@ export async function PATCH(
 ) {
   if (!(await getSession()))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  if (!validOrigin(request.headers.get("origin")))
+  if (!validOrigin(request.headers.get("origin"), request.url))
     return NextResponse.json({ error: "Origem inválida" }, { status: 403 });
   const parsed = z
     .object({ active: z.boolean() })
