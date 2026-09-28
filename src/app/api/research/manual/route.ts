@@ -17,7 +17,7 @@ const requestSchema = z.object({
 export async function POST(request: Request) {
   if (!(await getSession()))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  if (!validOrigin(request.headers.get("origin")))
+  if (!validOrigin(request.headers.get("origin"), request.url))
     return NextResponse.json({ error: "Origem inválida" }, { status: 403 });
   const body = await request.json().catch(() => null);
   const parsed = requestSchema.safeParse(body);

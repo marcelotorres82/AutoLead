@@ -8,8 +8,7 @@ const inputSchema = z.object({
   password: z.string().min(8).max(128),
 });
 export async function POST(request: Request) {
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
-  if (!validOrigin(request.headers.get("origin"), host))
+  if (!validOrigin(request.headers.get("origin"), request.url))
     return NextResponse.json({ error: "Origem inválida" }, { status: 403 });
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "local";
   const rate = checkRateLimit(ip);

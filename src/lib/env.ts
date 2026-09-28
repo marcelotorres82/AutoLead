@@ -33,7 +33,7 @@ const envSchema = z.object({
     .optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
 });
-export const env = envSchema.parse({
+const parsedEnv = envSchema.parse({
   DATABASE_URL: process.env.DATABASE_URL || undefined,
   EXA_API_KEY: process.env.EXA_API_KEY || undefined,
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || undefined,
@@ -57,6 +57,14 @@ export const env = envSchema.parse({
   TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET || undefined,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
 });
+if (
+  process.env.NODE_ENV === "production" &&
+  process.env.VERCEL_ENV !== "preview" &&
+  !parsedEnv.AUTH_SECRET
+) {
+  throw new Error("AUTH_SECRET é obrigatório em produção");
+}
+export const env = parsedEnv;
 export const demoMode = !(
   env.DATABASE_URL &&
   env.EXA_API_KEY &&
