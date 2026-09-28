@@ -10,7 +10,7 @@ export async function POST(
   const session = await getSession();
   if (!session)
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  if (!validOrigin(request.headers.get("origin"), request.headers.get("host")))
+  if (!validOrigin(request.headers.get("origin"), request.url))
     return NextResponse.json({ error: "Origem inválida" }, { status: 403 });
   const { id } = await context.params;
   const actor =
