@@ -57,7 +57,11 @@ const parsedEnv = envSchema.parse({
   TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET || undefined,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
 });
-if (process.env.NODE_ENV === "production" && !parsedEnv.AUTH_SECRET) {
+if (
+  process.env.NODE_ENV === "production" &&
+  process.env.VERCEL_ENV !== "preview" &&
+  !parsedEnv.AUTH_SECRET
+) {
   throw new Error("AUTH_SECRET é obrigatório em produção");
 }
 export const env = parsedEnv;
