@@ -54,61 +54,13 @@ export function assertSafePublicUrl(input: string) {
 
 export function validOrigin(
   origin: string | null,
-  hostHeader?: string | null,
+  requestUrl: string,
 ): boolean {
-  if (!origin) return true;
+  if (!origin) return false;
   try {
     const parsedOrigin = new URL(origin);
-    const originHost = parsedOrigin.host.toLowerCase();
-    const originHostname = parsedOrigin.hostname.toLowerCase();
-
-    // Permitir requisições locais
-    if (
-      originHostname === "localhost" ||
-      originHostname === "127.0.0.1" ||
-      originHostname === "::1" ||
-      originHostname.endsWith(".localhost")
-    ) {
-      return true;
-    }
-
-    // Permitir qualquer preview/deployment da Vercel para o projeto
-    if (originHostname.endsWith(".vercel.app")) {
-      return true;
-    }
-
-    // Permitir se corresponder ao header host da requisição (same-origin)
-    if (
-      hostHeader &&
-      (originHost === hostHeader.toLowerCase() ||
-        originHostname === hostHeader.toLowerCase())
-    ) {
-      return true;
-    }
-
-    // Validar contra URLs configuradas no ambiente
-    const allowedEnvUrls = [
-      process.env.NEXT_PUBLIC_APP_URL,
-      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
-      process.env.VERCEL_PROJECT_PRODUCTION_URL
-        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-        : undefined,
-    ].filter(Boolean);
-
-    for (const envUrl of allowedEnvUrls) {
-      try {
-        if (
-          new URL(envUrl!).origin.toLowerCase() ===
-          parsedOrigin.origin.toLowerCase()
-        ) {
-          return true;
-        }
-      } catch {
-        // Ignorar URLs inválidas de ambiente
-      }
-    }
-
-    return false;
+    const requestOrigin = new URL(requestUrl).origin;
+    return parsedOrigin.origin.toLowerCase() === requestOrigin.toLowerCase();
   } catch {
     return false;
   }
