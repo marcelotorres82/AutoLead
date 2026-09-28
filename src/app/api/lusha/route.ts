@@ -13,7 +13,7 @@ export async function GET() {
 export async function PUT(request: Request) {
   if (!(await getSession()))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  if (!validOrigin(request.headers.get("origin")))
+  if (!validOrigin(request.headers.get("origin"), request.url))
     return NextResponse.json({ error: "Origem inválida" }, { status: 403 });
   const parsed = z
     .object({ used: z.number().int().min(0).max(300) })
