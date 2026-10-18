@@ -78,13 +78,16 @@ export async function verifyOAuthStateToken(
 
 export function resolveGoogleCallbackUrl(requestUrl: string): string {
   const reqUrl = new URL(requestUrl);
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (
-    process.env.NODE_ENV !== "production" &&
-    (reqUrl.hostname === "localhost" || reqUrl.hostname === "127.0.0.1")
+    !configuredUrl ||
+    (reqUrl.hostname !== "localhost" &&
+      reqUrl.hostname !== "127.0.0.1" &&
+      configuredUrl.includes("localhost"))
   ) {
     return `${reqUrl.origin}/api/auth/google/callback`;
   }
-  const baseUrl = (env.NEXT_PUBLIC_APP_URL || reqUrl.origin).replace(/\/$/, "");
+  const baseUrl = configuredUrl.replace(/\/$/, "");
   return `${baseUrl}/api/auth/google/callback`;
 }
 

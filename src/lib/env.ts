@@ -17,7 +17,7 @@ const envSchema = z.object({
   RESEARCH_DEBUG: z.enum(["true", "false"]).default("false"),
   CRON_SECRET: z.string().min(24).optional(),
   BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
-  AUTH_SECRET: z.string().min(32).optional(),
+  AUTH_SECRET: z.string().min(16).optional(),
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_PASSWORD_HASH: z.string().min(20).optional(),
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
