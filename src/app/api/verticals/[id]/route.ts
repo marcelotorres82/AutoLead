@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { setVerticalActive } from "@/lib/operations-repository";
-import { validOrigin } from "@/lib/security";
+import { requestOriginValid } from "@/lib/security";
 
 export async function PATCH(
   request: Request,
@@ -10,7 +10,7 @@ export async function PATCH(
 ) {
   if (!(await getSession()))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  if (!validOrigin(request.headers.get("origin")))
+  if (!requestOriginValid(request))
     return NextResponse.json({ error: "Origem inválida" }, { status: 403 });
   const parsed = z
     .object({ active: z.boolean() })

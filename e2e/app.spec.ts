@@ -2,8 +2,24 @@ import { test, expect } from "@playwright/test";
 test.beforeEach(async ({ page }) => {
   await page.goto("/login");
   await page.waitForLoadState("networkidle");
+  await expect(
+    page.getByRole("link", { name: "Entrar com Google" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(/dashboard/);
+});
+test("login, proteção de rota e alerta Google OAuth", async ({ browser }) => {
+  const unauthContext = await browser.newContext();
+  const unauthPage = await unauthContext.newPage();
+  await unauthPage.goto("/dashboard");
+  await expect(unauthPage).toHaveURL(/\/login/);
+  await unauthPage.goto("/login?error=google_unauthorized");
+  await expect(
+    unauthPage.getByText(
+      /Apenas marcelotorres1982@gmail\.com possui permissão/,
+    ),
+  ).toBeVisible();
+  await unauthContext.close();
 });
 test("login e dashboard", async ({ page }) => {
   await expect(

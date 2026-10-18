@@ -3,7 +3,8 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { enqueueLeadResearch } from "@/lib/enqueue-lead-research";
 import { getLeadResearchContexts } from "@/lib/lead-repository";
-import { validOrigin } from "@/lib/security";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { requestOriginValid } from "@/lib/security";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -13,10 +14,24 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  if (!(await getSession()))
+  const session = await getSession();
+  if (!session)
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  if (!validOrigin(request.headers.get("origin")))
+  if (!requestOriginValid(request))
     return NextResponse.json({ error: "Origem inválida" }, { status: 403 });
+  const ip = getClientIp(request);
+  const rate = checkRateLimit(
+    `leads-research:${session.email}:${ip}`,
+    10,
+    15 * 60_000,
+  );
+  if (!rate.allowed)
+    return NextResponse.json(
+      {
+        error: "Limite de pesquisas de leads atingido. Aguarde alguns minutos.",
+      },
+      { status: 429 },
+    );
   const parsed = requestSchema.safeParse(
     await request.json().catch(() => null),
   );

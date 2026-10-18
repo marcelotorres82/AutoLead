@@ -1,28 +1,42 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { verifySession, sessionCookie } from "@/lib/auth";
-const publicPaths = [
-  "/login",
-  "/api/auth/login",
-  "/api/telegram/webhook",
+import { sessionCookie, verifySession } from "@/lib/auth";
+
+const protectedPrefixes = [
+  "/dashboard",
+  "/research",
+  "/companies",
+  "/personas",
+  "/verticals",
+  "/history",
+  "/backups",
+  "/settings",
 ];
+
 export async function proxy(request: NextRequest) {
-  const path = request.nextUrl.pathname;
-  if (
-    publicPaths.some((item) => path.startsWith(item)) ||
-    path.startsWith("/_next") ||
-    path.startsWith("/.well-known/workflow/") ||
-    path === "/favicon.ico" ||
-    path.startsWith("/api/cron")
-  )
+  const { pathname } = request.nextUrl;
+
+  const isProtected =
+    pathname === "/" ||
+    protectedPrefixes.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    );
+
+  if (!isProtected) {
     return NextResponse.next();
-  const session = await verifySession(
-    request.cookies.get(sessionCookie)?.value,
-  );
-  if (!session) return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  const token = request.cookies.get(sessionCookie)?.value;
+  const session = await verifySession(token);
+  if (!session) {
+    const loginUrl = new URL("/login", request.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
   return NextResponse.next();
 }
+
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.well-known/workflow/).*)",
+    "/((?!api|_next/static|_next/image|\\.well-known|icon\\.svg|favicon\\.ico).*)",
   ],
 };

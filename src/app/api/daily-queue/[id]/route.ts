@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { updateDailyQueueItem } from "@/lib/daily-queue";
-import { validOrigin } from "@/lib/security";
+import { requestOriginValid } from "@/lib/security";
 
 const schema = z.object({
   status: z.enum(["READY", "CLAIMED", "CONTACTED", "SNOOZED", "DISMISSED"]),
@@ -15,9 +15,10 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  if (!(await getSession()))
+  const session = await getSession();
+  if (!session)
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  if (!validOrigin(request.headers.get("origin"), request.headers.get("host")))
+  if (!requestOriginValid(request))
     return NextResponse.json({ error: "Origem inválida" }, { status: 403 });
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
@@ -26,7 +27,12 @@ export async function PATCH(
       { status: 400 },
     );
   const { id } = await context.params;
-  if (!(await updateDailyQueueItem(id, parsed.data)))
+  if (
+    !(await updateDailyQueueItem(id, {
+      ...parsed.data,
+      actor: parsed.data.actor || session.email,
+    }))
+  )
     return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

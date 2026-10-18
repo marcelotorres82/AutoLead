@@ -25,11 +25,13 @@ import {
   failResearchStage,
   startResearchStage,
 } from "@/lib/research-stage-repository";
+import { safeCompareSecrets } from "@/lib/security";
 
 const running = new Set<string>();
 
 export function cronAuthorized(header: string | null, secret?: string) {
-  return Boolean(secret && header === `Bearer ${secret}`);
+  if (!secret || !header) return false;
+  return safeCompareSecrets(header, `Bearer ${secret}`);
 }
 
 export function buildSearchQueries(

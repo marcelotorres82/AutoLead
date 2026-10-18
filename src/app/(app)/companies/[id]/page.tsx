@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { companyStatuses } from "@/lib/domain";
 import { scoreLabel } from "@/lib/evidence-intelligence";
+import { safeExternalHref } from "@/lib/utils";
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
   const { companies, updateStatus } = useDemoStore();
@@ -63,10 +64,10 @@ export default function CompanyDetail() {
           <p className="mt-1 text-sm text-slate-500">
             {c.domain} · {c.city}/{c.state} · {c.size} · {c.subsegment}
           </p>
-          {c.linkedinUrl ? (
+          {safeExternalHref(c.linkedinUrl) ? (
             <a
               className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-cyan-700 hover:underline dark:text-cyan-300"
-              href={c.linkedinUrl}
+              href={safeExternalHref(c.linkedinUrl)!}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -175,10 +176,10 @@ export default function CompanyDetail() {
                       {c.classificationReason}
                     </p>
                   ) : null}
-                  {c.classificationSourceUrl ? (
+                  {safeExternalHref(c.classificationSourceUrl) ? (
                     <a
                       className="mt-2 inline-flex items-center gap-1 text-cyan-700 hover:underline dark:text-cyan-300"
-                      href={c.classificationSourceUrl}
+                      href={safeExternalHref(c.classificationSourceUrl)!}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -285,16 +286,18 @@ export default function CompanyDetail() {
                         {evidence.collectedAt.slice(0, 10)}
                       </p>
                     </div>
-                    <Button asChild variant="outline" size="sm">
-                      <a
-                        href={evidence.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Abrir
-                        <ExternalLink className="size-3" />
-                      </a>
-                    </Button>
+                    {safeExternalHref(evidence.sourceUrl) ? (
+                      <Button asChild variant="outline" size="sm">
+                        <a
+                          href={safeExternalHref(evidence.sourceUrl)!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Abrir
+                          <ExternalLink className="size-3" />
+                        </a>
+                      </Button>
+                    ) : null}
                   </div>
                   {evidence.excerpt ? (
                     <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">

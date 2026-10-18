@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { lushaMetrics } from "@/lib/domain";
+import { safeExternalHref } from "@/lib/utils";
 export default function PersonasPage() {
   const {
     personas,
@@ -181,10 +182,10 @@ export default function PersonasPage() {
                   </p>
                 ) : null}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {p.sourceUrl ? (
+                  {safeExternalHref(p.sourceUrl) ? (
                     <Button asChild size="sm" variant="outline">
                       <a
-                        href={p.sourceUrl}
+                        href={safeExternalHref(p.sourceUrl)!}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
@@ -192,10 +193,10 @@ export default function PersonasPage() {
                       </a>
                     </Button>
                   ) : null}
-                  {p.profileUrl ? (
+                  {safeExternalHref(p.profileUrl) ? (
                     <Button asChild size="sm" variant="outline">
                       <a
-                        href={p.profileUrl}
+                        href={safeExternalHref(p.profileUrl)!}
                         target="_blank"
                         rel="noopener noreferrer"
                       >

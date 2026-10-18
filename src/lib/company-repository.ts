@@ -697,7 +697,12 @@ export async function persistAnalyzedCompanies(
   return { created, duplicateCount };
 }
 
-export async function updateCompanyStatus(id: string, status: CompanyStatus) {
+export async function updateCompanyStatus(
+  id: string,
+  status: CompanyStatus,
+  actorEmail?: string,
+  actorName?: string,
+) {
   const db = getDb();
   const [current] = await db
     .select({ status: companies.status })
@@ -706,10 +711,12 @@ export async function updateCompanyStatus(id: string, status: CompanyStatus) {
     .limit(1);
   if (!current) return false;
   let userId: string | null = null;
-  if (env.ADMIN_EMAIL) {
+  const resolvedEmail = (actorEmail || env.ADMIN_EMAIL)?.trim().toLowerCase();
+  const resolvedName = actorName?.trim() || "Administrador";
+  if (resolvedEmail) {
     const inserted = await db
       .insert(users)
-      .values({ email: env.ADMIN_EMAIL, name: "Administrador" })
+      .values({ email: resolvedEmail, name: resolvedName })
       .onConflictDoNothing({ target: users.email })
       .returning({ id: users.id });
     if (inserted[0]) userId = inserted[0].id;
@@ -717,7 +724,7 @@ export async function updateCompanyStatus(id: string, status: CompanyStatus) {
       const [existing] = await db
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.email, env.ADMIN_EMAIL))
+        .where(eq(users.email, resolvedEmail))
         .limit(1);
       userId = existing?.id ?? null;
     }

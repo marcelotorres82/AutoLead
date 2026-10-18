@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { env } from "@/lib/env";
+import { safeCompareSecrets } from "@/lib/security";
 import { handleTelegramText } from "@/lib/telegram";
 
 export const runtime = "nodejs";
@@ -19,8 +20,10 @@ const updateSchema = z.object({
 export async function POST(request: Request) {
   if (
     !env.TELEGRAM_WEBHOOK_SECRET ||
-    request.headers.get("x-telegram-bot-api-secret-token") !==
-      env.TELEGRAM_WEBHOOK_SECRET
+    !safeCompareSecrets(
+      request.headers.get("x-telegram-bot-api-secret-token"),
+      env.TELEGRAM_WEBHOOK_SECRET,
+    )
   )
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 

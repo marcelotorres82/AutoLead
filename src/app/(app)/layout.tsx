@@ -1,6 +1,8 @@
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { AppShell } from "@/components/app-shell";
 import { DemoStoreProvider } from "@/components/demo-store";
+import { getSession } from "@/lib/auth";
 import { listCompanies } from "@/lib/company-repository";
 import { demoCompanies } from "@/lib/demo-data";
 import { demoMode } from "@/lib/env";
@@ -15,6 +17,10 @@ export default async function Layout({
   children: React.ReactNode;
 }) {
   await connection();
+  const session = await getSession();
+  if (!session) {
+    redirect("/login");
+  }
   let initialCompanies = demoCompanies;
   let initialResearchRuns: ResearchRunView[] = [];
   let initialPersonas: Persona[] | undefined;
@@ -39,7 +45,17 @@ export default async function Layout({
       initialLushaUsed={initialLushaUsed}
       demoMode={demoMode}
     >
-      <AppShell demoMode={demoMode}>{children}</AppShell>
+      <AppShell
+        demoMode={demoMode}
+        user={{
+          email: session.email,
+          name: session.name,
+          picture: session.picture,
+          provider: session.provider,
+        }}
+      >
+        {children}
+      </AppShell>
     </DemoStoreProvider>
   );
 }

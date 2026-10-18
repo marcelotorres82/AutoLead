@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { listCrmOutbox, queueCompanyForCrm } from "@/lib/crm-outbox-repository";
-import { validOrigin } from "@/lib/security";
+import { requestOriginValid } from "@/lib/security";
 
 export async function GET() {
   if (!(await getSession()))
@@ -13,7 +13,7 @@ export async function GET() {
 export async function POST(request: Request) {
   if (!(await getSession()))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  if (!validOrigin(request.headers.get("origin"), request.headers.get("host")))
+  if (!requestOriginValid(request))
     return NextResponse.json({ error: "Origem inválida" }, { status: 403 });
   const parsed = z
     .object({

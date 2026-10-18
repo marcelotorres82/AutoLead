@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { leadReviewStatuses } from "@/lib/lead-domain";
 import { createPersona, listPersonas } from "@/lib/operations-repository";
-import { validOrigin } from "@/lib/security";
+import { requestOriginValid } from "@/lib/security";
 
 const personaSchema = z.object({
   name: z.string().trim().min(2).max(160),
@@ -28,7 +28,7 @@ export async function GET() {
 export async function POST(request: Request) {
   if (!(await getSession()))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  if (!validOrigin(request.headers.get("origin")))
+  if (!requestOriginValid(request))
     return NextResponse.json({ error: "Origem inválida" }, { status: 403 });
   const parsed = personaSchema.safeParse(
     await request.json().catch(() => null),

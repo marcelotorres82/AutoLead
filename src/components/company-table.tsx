@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { CompanyStatus } from "@/lib/domain";
 import { scoreLabel } from "@/lib/evidence-intelligence";
+import { safeExternalHref } from "@/lib/utils";
 export function CompanyTable() {
   const { companies, updateStatus, enqueueLeadResearch } = useDemoStore();
   const [query, setQuery] = useState("");
@@ -255,10 +256,10 @@ export function CompanyTable() {
                   <p className="mt-1 text-xs text-slate-500">{c.subsegment}</p>
                 </td>
                 <td className="p-4">
-                  {c.linkedinUrl ? (
+                  {safeExternalHref(c.linkedinUrl) ? (
                     <a
                       className="inline-flex items-center gap-1 font-medium text-cyan-700 hover:underline dark:text-cyan-300"
-                      href={c.linkedinUrl}
+                      href={safeExternalHref(c.linkedinUrl)!}
                       target="_blank"
                       rel="noopener noreferrer"
                     >

@@ -20,6 +20,9 @@ const envSchema = z.object({
   AUTH_SECRET: z.string().min(32).optional(),
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_PASSWORD_HASH: z.string().min(20).optional(),
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  ALLOWED_GOOGLE_EMAILS: z.string().default("marcelotorres1982@gmail.com"),
   TELEGRAM_BOT_TOKEN: z.string().min(20).optional(),
   TELEGRAM_CHAT_ID: z
     .string()
@@ -52,6 +55,10 @@ export const env = envSchema.parse({
   AUTH_SECRET: process.env.AUTH_SECRET || undefined,
   ADMIN_EMAIL: process.env.ADMIN_EMAIL || undefined,
   ADMIN_PASSWORD_HASH: process.env.ADMIN_PASSWORD_HASH || undefined,
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || undefined,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || undefined,
+  ALLOWED_GOOGLE_EMAILS:
+    process.env.ALLOWED_GOOGLE_EMAILS || "marcelotorres1982@gmail.com",
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || undefined,
   TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || undefined,
   TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET || undefined,
@@ -71,6 +78,8 @@ export function llmModelFor(
     : fallback;
 }
 export function integrationStatus() {
+  const googleOAuth = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+  const passwordAuth = Boolean(env.ADMIN_EMAIL && env.ADMIN_PASSWORD_HASH);
   return {
     database: Boolean(env.DATABASE_URL),
     exa: Boolean(env.EXA_API_KEY),
@@ -79,9 +88,8 @@ export function integrationStatus() {
     anthropic: Boolean(env.ANTHROPIC_API_KEY),
     openai: Boolean(env.OPENAI_API_KEY),
     blob: Boolean(env.BLOB_READ_WRITE_TOKEN),
-    authentication: Boolean(
-      env.AUTH_SECRET && env.ADMIN_EMAIL && env.ADMIN_PASSWORD_HASH,
-    ),
+    googleOAuth,
+    authentication: Boolean(env.AUTH_SECRET && (googleOAuth || passwordAuth)),
     telegram: Boolean(
       env.TELEGRAM_BOT_TOKEN &&
       env.TELEGRAM_CHAT_ID &&

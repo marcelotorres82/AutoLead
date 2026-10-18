@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { recordAuditLog } from "@/lib/audit-log";
 import { createSession, sessionCookie, verifyCredentials } from "@/lib/auth";
-import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
-import { validOrigin } from "@/lib/security";
+import { checkRateLimit, getClientIp, resetRateLimit } from "@/lib/rate-limit";
+import { requestOriginValid } from "@/lib/security";
+
 const inputSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(128),
 });
+
 export async function POST(request: Request) {
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
-  if (!validOrigin(request.headers.get("origin"), host))
+  if (!requestOriginValid(request))
     return NextResponse.json({ error: "Origem inválida" }, { status: 403 });
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "local";
-  const rate = checkRateLimit(ip);
+  const ip = getClientIp(request);
+  const rate = checkRateLimit(`login:${ip}`);
   if (!rate.allowed)
     return NextResponse.json(
       { error: "Muitas tentativas. Aguarde 15 minutos." },
@@ -29,14 +31,34 @@ export async function POST(request: Request) {
       { error: "E-mail ou senha inválidos" },
       { status: 401 },
     );
-  resetRateLimit(ip);
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set(sessionCookie, await createSession(input.email), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 12,
+  resetRateLimit(`login:${ip}`);
+  const normalizedEmail = input.email.trim().toLowerCase();
+  const isDemo = normalizedEmail === "demo@prospectradar.local";
+  await recordAuditLog({
+    actorEmail: normalizedEmail,
+    actorName: isDemo ? "Demonstração" : "Administrador",
+    action: "AUTH_LOGIN_SUCCESS",
+    entity: "users",
+    entityId: normalizedEmail,
+    metadata: { provider: isDemo ? "demo" : "credentials" },
+    ip,
   });
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(
+    sessionCookie,
+    await createSession({
+      email: normalizedEmail,
+      name: isDemo ? "Demonstração" : "Administrador",
+      provider: isDemo ? "demo" : "credentials",
+      role: "admin",
+    }),
+    {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 12,
+    },
+  );
   return response;
 }

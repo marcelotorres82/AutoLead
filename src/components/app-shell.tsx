@@ -20,9 +20,12 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { useDemoStore } from "@/components/demo-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { countsTowardGoal, dateInSaoPaulo } from "@/lib/domain";
 import { cn } from "@/lib/utils";
+
 const nav = [
   { href: "/dashboard", label: "Visão geral", icon: BarChart3 },
   { href: "/research", label: "Pesquisa diária", icon: CalendarSearch },
@@ -33,17 +36,37 @@ const nav = [
   { href: "/backups", label: "Backups", icon: DatabaseBackup },
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
+
+export type ShellUser = {
+  email: string;
+  name?: string;
+  picture?: string;
+  provider?: string;
+};
+
 export function AppShell({
   children,
   demoMode,
+  user,
 }: {
   children: React.ReactNode;
   demoMode: boolean;
+  user?: ShellUser;
 }) {
   const path = usePathname();
   const router = useRouter();
+  const { companies } = useDemoStore();
   const { resolvedTheme, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
+  const [globalQuery, setGlobalQuery] = useState("");
+  const today = dateInSaoPaulo();
+  const reviewedToday = Math.min(
+    30,
+    companies.filter(
+      (company) =>
+        countsTowardGoal(company.status) && company.reviewedAt === today,
+    ).length,
+  );
   const sidebar = (
     <aside className="flex h-full w-64 flex-col bg-[#071b33] text-slate-200">
       <div className="flex h-20 items-center gap-3 px-5">
@@ -116,18 +139,48 @@ export function AppShell({
           >
             <Menu />
           </Button>
-          <div className="relative max-w-md flex-1">
+          <form
+            className="relative max-w-md flex-1"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const trimmed = globalQuery.trim();
+              router.push(
+                trimmed
+                  ? `/companies?q=${encodeURIComponent(trimmed)}`
+                  : "/companies",
+              );
+            }}
+          >
             <Search className="absolute left-3 top-2.5 size-4 text-slate-400" />
             <Input
               className="pl-9"
               placeholder="Pesquisar empresas, domínios ou tags…"
               aria-label="Pesquisa global"
+              value={globalQuery}
+              onChange={(event) => setGlobalQuery(event.target.value)}
             />
-          </div>
+          </form>
           <div className="hidden text-right text-xs sm:block">
             <p className="font-semibold">Meta diária</p>
-            <p className="text-slate-500">0 de 30 revisadas</p>
+            <p className="text-slate-500">{reviewedToday} de 30 revisadas</p>
           </div>
+          {user ? (
+            <div
+              className="hidden items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs dark:border-slate-800 md:flex"
+              title={user.email}
+            >
+              <div className="max-w-[160px] truncate text-right">
+                <p className="truncate font-medium">
+                  {user.name || user.email}
+                </p>
+                {user.name ? (
+                  <p className="truncate text-[11px] text-slate-500">
+                    {user.email}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
           <Button
             variant="ghost"
             size="icon"
