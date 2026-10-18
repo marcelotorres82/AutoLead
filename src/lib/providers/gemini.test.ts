@@ -122,4 +122,49 @@ describe("Gemini", () => {
       "empresas com até 500 funcionários",
     );
   });
+
+  it("faz fallback automático de modelo quando o modelo principal retorna 503", async () => {
+    env.GEMINI_API_KEY = "test-key";
+    let callCount = 0;
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      callCount += 1;
+      if (url.includes("gemini-2.5-flash:")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              error: {
+                message:
+                  "This model is currently experiencing high demand. Please try again later.",
+              },
+            }),
+            { status: 503 },
+          ),
+        );
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: JSON.stringify({ companies: [] }) }],
+                },
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const analyzed = await new GeminiAiProvider().analyzeBatch([
+      { title: "Fonte 1", url: "https://example.com/1", content: "Conteúdo" },
+    ]);
+
+    expect(analyzed).toEqual([]);
+    expect(callCount).toBe(2);
+    expect(fetchMock.mock.calls[0][0]).toContain("gemini-2.5-flash:");
+    expect(fetchMock.mock.calls[1][0]).toContain("gemini-2.5-flash-lite:");
+  });
 });

@@ -10,10 +10,8 @@ import {
   listExistingLeadIdentities,
   persistResearchedLeads,
 } from "@/lib/lead-repository";
-import { ClaudeAiProvider } from "@/lib/providers/claude";
 import { GeminiAiProvider } from "@/lib/providers/gemini";
 import { ExaSearchProvider } from "@/lib/providers/exa";
-import { OpenAiProvider } from "@/lib/providers/openai";
 import type { AiProvider, SearchResult } from "@/lib/providers/types";
 import { mergeSearchResults } from "@/lib/research";
 import { updateResearchRunMetadata } from "@/lib/research-run-repository";
@@ -23,18 +21,11 @@ function configuredAiProviders(): Array<{
   model: string;
 }> {
   const providers: Array<{ provider: AiProvider; model: string }> = [];
-  if (env.ANTHROPIC_API_KEY)
-    providers.push({
-      provider: new ClaudeAiProvider(),
-      model: env.ANTHROPIC_MODEL,
-    });
   if (env.GEMINI_API_KEY)
     providers.push({
       provider: new GeminiAiProvider(),
       model: env.GEMINI_MODEL,
     });
-  if (env.OPENAI_API_KEY)
-    providers.push({ provider: new OpenAiProvider(), model: env.OPENAI_MODEL });
   return providers;
 }
 
@@ -42,11 +33,7 @@ export async function runLeadResearch(runId: string, companyId: string) {
   const started = Date.now();
   const db = getDb();
   try {
-    if (
-      !env.DATABASE_URL ||
-      !env.EXA_API_KEY ||
-      (!env.GEMINI_API_KEY && !env.ANTHROPIC_API_KEY && !env.OPENAI_API_KEY)
-    )
+    if (!env.DATABASE_URL || !env.EXA_API_KEY || !env.GEMINI_API_KEY)
       throw new Error("Integrações de pesquisa incompletas");
     const [context] = await getLeadResearchContexts([companyId]);
     if (!context) throw new Error("Empresa não encontrada");
@@ -54,11 +41,9 @@ export async function runLeadResearch(runId: string, companyId: string) {
       throw new Error("A empresa precisa estar aprovada para pesquisar leads");
 
     const aiProviders = configuredAiProviders();
-    const providerName = `exa+${aiProviders[0]?.provider.name ?? "sem-ia"}`;
+    const providerName = `exa+${aiProviders[0]?.provider.name ?? "gemini"}`;
     const modelName =
-      aiProviders.length > 0
-        ? aiProviders[0].model
-        : "gemini-flash · gpt-5 · perplexity-sonar";
+      aiProviders.length > 0 ? aiProviders[0].model : "gemini-2.5-flash";
 
     await db
       .update(researchRuns)

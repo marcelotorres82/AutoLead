@@ -3,7 +3,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url().optional(),
   EXA_API_KEY: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
-  GEMINI_MODEL: z.string().default("gemini-3.1-flash-lite"),
+  GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_MODEL: z.string().default("claude-3-5-sonnet-20241022"),
   PERPLEXITY_API_KEY: z.string().min(1).optional(),
@@ -12,7 +12,7 @@ const envSchema = z.object({
   OPENAI_MODEL: z.string().default("gpt-5-mini"),
   LLM_PROVIDER: z
     .enum(["auto", "gemini", "anthropic", "openai"])
-    .default("auto"),
+    .default("gemini"),
   LLM_MODEL: z.string().min(1).optional(),
   RESEARCH_DEBUG: z.enum(["true", "false"]).default("false"),
   CRON_SECRET: z.string().min(24).optional(),
@@ -69,7 +69,7 @@ export const env = envSchema.parse({
 export const demoMode = !(
   env.DATABASE_URL &&
   env.EXA_API_KEY &&
-  (env.GEMINI_API_KEY || env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY)
+  env.GEMINI_API_KEY
 );
 export function llmModelFor(
   provider: "gemini" | "anthropic" | "openai",
@@ -85,10 +85,7 @@ export function integrationStatus() {
   return {
     database: Boolean(env.DATABASE_URL),
     exa: Boolean(env.EXA_API_KEY),
-    perplexity: Boolean(env.PERPLEXITY_API_KEY),
     gemini: Boolean(env.GEMINI_API_KEY),
-    anthropic: Boolean(env.ANTHROPIC_API_KEY),
-    openai: Boolean(env.OPENAI_API_KEY),
     blob: Boolean(env.BLOB_READ_WRITE_TOKEN),
     googleOAuth,
     authentication: Boolean(env.AUTH_SECRET && (googleOAuth || passwordAuth)),

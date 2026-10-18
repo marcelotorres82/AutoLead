@@ -13,10 +13,8 @@ import { buildDailyLeadQueue } from "@/lib/daily-queue";
 import { verticalNames, verticalTaxonomy } from "@/lib/domain";
 import { env } from "@/lib/env";
 import { sanitizeSearchResult } from "@/lib/external-content";
-import { ClaudeAiProvider } from "@/lib/providers/claude";
 import { GeminiAiProvider } from "@/lib/providers/gemini";
 import { ExaSearchProvider } from "@/lib/providers/exa";
-import { OpenAiProvider } from "@/lib/providers/openai";
 import type { SearchResult } from "@/lib/providers/types";
 import { searchWithCache } from "@/lib/research-cache";
 import { updateResearchRunMetadata } from "@/lib/research-run-repository";
@@ -131,19 +129,10 @@ export function mergeSearchResults(
 
 function configuredAiProviders() {
   const providers: Array<{
-    key: "gemini" | "anthropic" | "openai";
-    provider: GeminiAiProvider | ClaudeAiProvider | OpenAiProvider;
+    key: "gemini";
+    provider: GeminiAiProvider;
     model: string;
   }> = [];
-  if (env.ANTHROPIC_API_KEY)
-    providers.push({
-      key: "anthropic",
-      provider: new ClaudeAiProvider(),
-      model:
-        env.LLM_PROVIDER === "anthropic" && env.LLM_MODEL
-          ? env.LLM_MODEL
-          : env.ANTHROPIC_MODEL,
-    });
   if (env.GEMINI_API_KEY)
     providers.push({
       key: "gemini",
@@ -153,18 +142,7 @@ function configuredAiProviders() {
           ? env.LLM_MODEL
           : env.GEMINI_MODEL,
     });
-  if (env.OPENAI_API_KEY)
-    providers.push({
-      key: "openai",
-      provider: new OpenAiProvider(),
-      model:
-        env.LLM_PROVIDER === "openai" && env.LLM_MODEL
-          ? env.LLM_MODEL
-          : env.OPENAI_MODEL,
-    });
-  return env.LLM_PROVIDER === "auto"
-    ? providers
-    : providers.sort((a) => (a.key === env.LLM_PROVIDER ? -1 : 1));
+  return providers;
 }
 
 function researchLog(
@@ -209,8 +187,8 @@ export async function runDailyResearch(
     if (!env.EXA_API_KEY || !aiProviders.length)
       throw new Error("Integrações de pesquisa incompletas");
     const selectedAi = aiProviders[0] || {
-      provider: { name: "multi-ai (gemini+chatgpt+perplexity)" },
-      model: "gemini-flash · gpt-5 · perplexity-sonar",
+      provider: { name: "gemini" },
+      model: "gemini-2.5-flash",
     };
     const providerName = `exa+${selectedAi.provider.name}`;
 
