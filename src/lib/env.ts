@@ -34,6 +34,7 @@ const envSchema = z.object({
     .max(256)
     .regex(/^[A-Za-z0-9_-]+$/)
     .optional(),
+  APP_URL: z.string().url().optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
 });
 export const env = envSchema.parse({
@@ -62,7 +63,8 @@ export const env = envSchema.parse({
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || undefined,
   TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || undefined,
   TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET || undefined,
-  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  APP_URL: process.env.APP_URL || undefined,
+  NEXT_PUBLIC_APP_URL: process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL,
 });
 export const demoMode = !(
   env.DATABASE_URL &&

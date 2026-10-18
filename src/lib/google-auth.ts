@@ -78,7 +78,9 @@ export async function verifyOAuthStateToken(
 
 export function resolveGoogleCallbackUrl(requestUrl: string): string {
   const reqUrl = new URL(requestUrl);
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  const configuredUrl = (
+    process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL
+  )?.trim();
   if (
     !configuredUrl ||
     (reqUrl.hostname !== "localhost" &&

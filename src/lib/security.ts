@@ -142,6 +142,7 @@ export function validOrigin(
 
     // Validar contra URLs configuradas no ambiente
     const allowedEnvUrls = [
+      process.env.APP_URL,
       process.env.NEXT_PUBLIC_APP_URL,
       process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
       process.env.VERCEL_BRANCH_URL
