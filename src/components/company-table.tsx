@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { QualificationPanel } from "@/components/qualification-panel";
+import { MobileSheet } from "@/components/mobile-sheet";
 import { useMemo, useState } from "react";
 import {
   Check,
@@ -64,106 +66,182 @@ export function CompanyTable() {
       );
     }
   };
-  return (
-    <>
-      <div className="mb-4 grid gap-3 rounded-xl border bg-white p-4 dark:bg-slate-900 md:grid-cols-4">
-        <Input
-          placeholder="Filtrar por nome ou domínio"
-          value={query}
+  const filterControls = (
+    <div className="mb-4 grid gap-3 rounded-xl border bg-white p-4 dark:bg-slate-900 md:grid-cols-4">
+      <Input
+        aria-label="Filtrar por nome ou domínio"
+        placeholder="Filtrar por nome ou domínio"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setPage(1);
+        }}
+      />
+      <select
+        aria-label="Filtrar status"
+        className="h-10 rounded-lg border bg-transparent px-3 text-sm"
+        value={status}
+        onChange={(e) => {
+          setStatus(e.target.value);
+          setPage(1);
+        }}
+      >
+        <option>Todos</option>
+        <option>Nova</option>
+        <option>Pendente de validação</option>
+        <option>Aprovada para pesquisar leads</option>
+        <option>Pausada</option>
+        <option>Descartada</option>
+      </select>
+      <label className="flex items-center gap-3 text-sm">
+        Score mínimo{" "}
+        <input
+          className="flex-1 accent-cyan-600"
+          type="range"
+          min="0"
+          max="100"
+          value={min}
           onChange={(e) => {
-            setQuery(e.target.value);
+            setMin(Number(e.target.value));
             setPage(1);
           }}
         />
-        <select
-          aria-label="Filtrar status"
-          className="h-10 rounded-lg border bg-transparent px-3 text-sm"
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value);
-            setPage(1);
+        <strong>{min}</strong>
+      </label>
+      <div className="flex gap-2">
+        {selected.size ? (
+          <Button asChild variant="outline" className="flex-1">
+            <a href={`/api/export/csv?ids=${Array.from(selected).join(",")}`}>
+              <Download className="size-4" />
+              Exportar {selected.size}
+            </a>
+          </Button>
+        ) : (
+          <Button disabled variant="outline" className="flex-1">
+            <Download className="size-4" /> Exportar
+          </Button>
+        )}
+        <Button
+          className="flex-1"
+          disabled={!canResearchLeads || leadSearchPending}
+          title={
+            selectedCompanies.length > 5
+              ? "Selecione no máximo 5 empresas"
+              : selectedCompanies.some(
+                    (company) =>
+                      company.status !== "Aprovada para pesquisar leads",
+                  )
+                ? "Aprove todas as empresas selecionadas antes da pesquisa"
+                : "Pesquisar decisores nas empresas selecionadas"
+          }
+          onClick={async () => {
+            const confirmed = window.confirm(
+              `Pesquisar leads em ${selectedCompanies.length} empresa${selectedCompanies.length === 1 ? "" : "s"}? Serão feitas 4 consultas Exa por empresa, usando apenas o plano já configurado.`,
+            );
+            if (!confirmed) return;
+            setLeadSearchPending(true);
+            try {
+              const runs = await enqueueLeadResearch(
+                selectedCompanies.map((company) => company.id),
+              );
+              toast.success(
+                `${runs.length} pesquisa${runs.length === 1 ? "" : "s"} de leads iniciada${runs.length === 1 ? "" : "s"}`,
+              );
+              setSelected(new Set());
+            } catch (error) {
+              toast.error(
+                error instanceof Error
+                  ? error.message
+                  : "Falha ao iniciar pesquisa de leads",
+              );
+            } finally {
+              setLeadSearchPending(false);
+            }
           }}
         >
-          <option>Todos</option>
-          <option>Nova</option>
-          <option>Pendente de validação</option>
-          <option>Aprovada para pesquisar leads</option>
-          <option>Pausada</option>
-          <option>Descartada</option>
-        </select>
-        <label className="flex items-center gap-3 text-sm">
-          Score mínimo{" "}
-          <input
-            className="flex-1 accent-cyan-600"
-            type="range"
-            min="0"
-            max="100"
-            value={min}
-            onChange={(e) => {
-              setMin(Number(e.target.value));
-              setPage(1);
-            }}
-          />
-          <strong>{min}</strong>
-        </label>
-        <div className="flex gap-2">
-          {selected.size ? (
-            <Button asChild variant="outline" className="flex-1">
-              <a href={`/api/export/csv?ids=${Array.from(selected).join(",")}`}>
-                <Download className="size-4" />
-                Exportar {selected.size}
-              </a>
-            </Button>
-          ) : (
-            <Button disabled variant="outline" className="flex-1">
-              <Download className="size-4" /> Exportar
-            </Button>
-          )}
-          <Button
-            className="flex-1"
-            disabled={!canResearchLeads || leadSearchPending}
-            title={
-              selectedCompanies.length > 5
-                ? "Selecione no máximo 5 empresas"
-                : selectedCompanies.some(
-                      (company) =>
-                        company.status !== "Aprovada para pesquisar leads",
-                    )
-                  ? "Aprove todas as empresas selecionadas antes da pesquisa"
-                  : "Pesquisar decisores nas empresas selecionadas"
-            }
-            onClick={async () => {
-              const confirmed = window.confirm(
-                `Pesquisar leads em ${selectedCompanies.length} empresa${selectedCompanies.length === 1 ? "" : "s"}? Serão feitas 4 consultas Exa por empresa, usando apenas o plano já configurado.`,
-              );
-              if (!confirmed) return;
-              setLeadSearchPending(true);
-              try {
-                const runs = await enqueueLeadResearch(
-                  selectedCompanies.map((company) => company.id),
-                );
-                toast.success(
-                  `${runs.length} pesquisa${runs.length === 1 ? "" : "s"} de leads iniciada${runs.length === 1 ? "" : "s"}`,
-                );
-                setSelected(new Set());
-              } catch (error) {
-                toast.error(
-                  error instanceof Error
-                    ? error.message
-                    : "Falha ao iniciar pesquisa de leads",
-                );
-              } finally {
-                setLeadSearchPending(false);
-              }
-            }}
-          >
-            <UserSearch className="size-4" />
-            Leads
-          </Button>
-        </div>
+          <UserSearch className="size-4" />
+          Leads
+        </Button>
+      </div>
+    </div>
+  );
+  return (
+    <>
+      <div className="hidden md:block">{filterControls}</div>
+      <div className="mb-4 flex items-center justify-between md:hidden">
+        <p className="text-sm font-medium">
+          {filtered.length} contas · {selected.size} selecionadas
+        </p>
+        <MobileSheet
+          title="Filtrar empresas"
+          trigger={<Button variant="outline">Filtros e ações</Button>}
+        >
+          {filterControls}
+        </MobileSheet>
       </div>
       <div className="overflow-x-auto rounded-xl border bg-white dark:bg-slate-900">
-        <table className="w-full min-w-[1320px] text-left text-sm">
+        <div className="grid gap-4 p-3 md:hidden">
+          {visible.map((c) => (
+            <article
+              key={c.id}
+              className="min-w-0 rounded-2xl border bg-slate-50 p-4 dark:bg-slate-950"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <Link
+                    href={`/companies/${c.id}`}
+                    className="inline-flex min-h-11 items-center break-words text-lg font-bold text-cyan-900 dark:text-cyan-200"
+                  >
+                    {c.name}
+                  </Link>
+                  <p className="break-all text-xs text-slate-600 dark:text-slate-300">
+                    {c.domain}
+                  </p>
+                </div>
+                <label className="flex min-h-11 min-w-11 items-center justify-center">
+                  <span className="sr-only">Selecionar no cartão {c.name}</span>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(c.id)}
+                    disabled={!selected.has(c.id) && selected.size >= 100}
+                    onChange={(event) =>
+                      setSelected((current) => {
+                        const next = new Set(current);
+                        if (event.target.checked) next.add(c.id);
+                        else next.delete(c.id);
+                        return next;
+                      })
+                    }
+                  />
+                </label>
+              </div>
+              <div className="my-3 flex flex-wrap gap-2">
+                <Badge>{c.solution}</Badge>
+                <Badge>
+                  {c.qualificationStatus === "READY"
+                    ? "Qualificada"
+                    : "Validar evidências"}
+                </Badge>
+              </div>
+              <p className="mb-3 text-sm text-slate-700 dark:text-slate-200">
+                {c.description}
+              </p>
+              <QualificationPanel report={c.qualification} compact />
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => change(c.id, "Pausada")}
+                >
+                  Pausar
+                </Button>
+                <Button asChild>
+                  <Link href={`/companies/${c.id}`}>Abrir perfil</Link>
+                </Button>
+              </div>
+            </article>
+          ))}
+        </div>
+        <table className="hidden w-full min-w-[1320px] text-left text-sm md:table">
           <thead className="border-b bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800">
             <tr>
               <th className="p-4">
@@ -356,8 +434,8 @@ export function CompanyTable() {
         </table>
         {!filtered.length ? (
           <div className="p-10 text-center text-sm text-slate-500">
-            Nenhuma empresa corresponde aos filtros. Reduza os critérios para
-            ver resultados.
+            Nenhuma empresa corresponde aos filtros. Não há evidência suficiente
+            para apresentar uma conta qualificada.
           </div>
         ) : null}
         {filtered.length > pageSize ? (

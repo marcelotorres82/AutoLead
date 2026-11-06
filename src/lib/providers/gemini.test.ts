@@ -26,7 +26,7 @@ describe("Gemini", () => {
     );
   });
 
-  it("analisa três lotes em paralelo e consolida duplicatas", async () => {
+  it("mantém as fontes correlacionadas no mesmo lote e consolida duplicatas", async () => {
     env.GEMINI_API_KEY = "test-key";
     const company = {
       name: "Empresa Teste",
@@ -111,7 +111,7 @@ describe("Gemini", () => {
       "empresas com até 500 funcionários",
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(analyzed).toHaveLength(1);
     expect(analyzed[0].breakdown.evidenceQuality).toBe(5);
     const request = JSON.parse(fetchMock.mock.calls[0][1].body as string);

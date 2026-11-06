@@ -41,3 +41,45 @@ a:focus-visible {
     transition: none !important;
   }
 }
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+main {
+  overflow-wrap: anywhere;
+}
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  min-height: 44px;
+  min-width: 0;
+}
+input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: #0e7490;
+}
+.mobile-nav {
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+.mobile-sheet {
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+}
+summary:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid #0e7490;
+  outline-offset: 3px;
+}
+@media (max-width: 767px) {
+  h1 {
+    letter-spacing: -0.025em;
+  }
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

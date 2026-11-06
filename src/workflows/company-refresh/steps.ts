@@ -1,3 +1,4 @@
+import { refreshCompanyQualification } from "@/lib/qualification-refresh";
 import { FatalError, RetryableError } from "workflow";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -11,6 +12,7 @@ export async function refreshCompanyWebsiteStep(
 ) {
   "use step";
   try {
+    await refreshCompanyQualification(companyId);
     return await withResearchStage(
       {
         researchRunId: runId,

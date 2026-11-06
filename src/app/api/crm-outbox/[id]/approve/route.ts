@@ -17,7 +17,17 @@ export async function POST(
   const { id } = await context.params;
   const actor =
     typeof session.email === "string" ? session.email : "Administrador";
-  const item = await approveCrmOutboxItem(id, actor);
+  let item;
+  try {
+    item = await approveCrmOutboxItem(id, actor);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Falha na qualificação",
+      },
+      { status: 409 },
+    );
+  }
   if (!item)
     return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
   await recordAuditLog({

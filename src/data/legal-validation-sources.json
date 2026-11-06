@@ -1,0 +1,60 @@
+{
+  "collectedAt": "2026-11-06",
+  "method": "Amostra de trechos curtos de fontes públicas reais coletadas pela pesquisa web. Reexecução determinística, sem Exa/Gemini. Não representa pesquisa exaustiva nem validação da pipeline de produção.",
+  "candidates": [
+    {
+      "name": "Mattos Filho",
+      "domain": "mattosfilho.com.br",
+      "notes": "A página institucional informa mais de 1200 profissionais, mas não informa data original. Não foi localizado compromisso tecnológico explícito com 2027 nesta amostra.",
+      "sources": [
+        {
+          "url": "https://www.mattosfilho.com.br/",
+          "title": "Mattos Filho em números",
+          "content": "+1200 profissionais promovendo impacto positivo nos negócios e na sociedade",
+          "criterion": "headcount",
+          "headcount": 1200
+        },
+        {
+          "url": "https://www.mattosfilho.com.br/tecnologia-e-seguranca-da-informacao/",
+          "title": "Tecnologia e Segurança da informação",
+          "content": "Em 2017, nos tornamos o primeiro escritório full-service do país a implementar o cloud computing.",
+          "criterion": "technology"
+        },
+        {
+          "url": "https://www.mattosfilho.com.br/unico/mattos-filho-latin-lawyer-deal-tracker/",
+          "title": "Crescimento em transações",
+          "content": "Em relação ao ano anterior, o escritório apresentou crescimento de 35%, com 124 operações a mais",
+          "publishedAt": "2026-08-14",
+          "criterion": "growth"
+        }
+      ]
+    },
+    {
+      "name": "Pinheiro Neto Advogados",
+      "domain": "pinheironeto.com.br",
+      "notes": "Trecho indexado do relatório anual 2025 indica adoção de IA. A data precisa de publicação, porte acima de 1000 e roadmap 2027 não foram confirmados nesta amostra.",
+      "sources": [
+        {
+          "url": "https://www.pinheironeto.com.br/Documents/storage/files/2025-relatorio-anual-2026/relatorio-anual-2025.pdf",
+          "title": "Relatório anual 2025 — inovação",
+          "content": "aprimoramos também nosso ecossistema de ferramentas de inteligência artificial generativa.",
+          "criterion": "technology"
+        }
+      ]
+    },
+    {
+      "name": "DLA Piper",
+      "domain": "dlapiper.com",
+      "notes": "Controle negativo: 2027 aparece no nome de um ranking. Isso não comprova projeto tecnológico da firma em 2027. O porte global não pode ser automaticamente atribuído à entidade brasileira.",
+      "sources": [
+        {
+          "url": "https://www.dlapiper.com/en/news/2026/10/dla-piper-earns-powerhouse-recognition-in-bti-litigation-outlook-2027",
+          "title": "Reconhecimento BTI Litigation Outlook 2027",
+          "content": "DLA Piper earns Powerhouse recognition in BTI Litigation Outlook 2027",
+          "publishedAt": "2026-10-05",
+          "criterion": "roadmap"
+        }
+      ]
+    }
+  ]
+}

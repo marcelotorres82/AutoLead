@@ -1,0 +1,9 @@
+{
+  "status": "BLOCKED",
+  "missing": [
+    "EXA_API_KEY",
+    "GEMINI_API_KEY"
+  ],
+  "executedAt": "2026-11-06T10:17:30.604Z",
+  "reason": "Configuração existente não disponível para execução local; nenhum resultado simulado."
+}

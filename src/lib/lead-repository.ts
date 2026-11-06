@@ -1,4 +1,9 @@
 import "server-only";
+import {
+  isCurrentQualification,
+  isRecentEvidence,
+  type QualificationReport,
+} from "@/lib/high-precision";
 
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -12,7 +17,10 @@ import {
 } from "@/lib/lead-domain";
 import type { SearchResult } from "@/lib/providers/types";
 
-type CompanyAnalysisMetadata = { titles?: string[] };
+type CompanyAnalysisMetadata = {
+  titles?: string[];
+  qualification?: QualificationReport;
+};
 
 export async function getLeadResearchContexts(companyIds: string[]) {
   if (!companyIds.length) return [];
@@ -39,7 +47,9 @@ export async function getLeadResearchContexts(companyIds: string[]) {
       solution: row.solution ?? "WAAP",
       subsegment: row.subsegment ?? undefined,
       titles: metadata.titles ?? [],
-      approved: row.status === "Aprovada para pesquisar leads",
+      approved:
+        row.status === "Aprovada para pesquisar leads" &&
+        isCurrentQualification(metadata.qualification),
     } satisfies LeadResearchContext & {
       approved: boolean;
       subsegment?: string;
@@ -65,6 +75,9 @@ export async function persistResearchedLeads(
   runId: string,
 ) {
   const db = getDb();
+  const [current] = await getLeadResearchContexts([context.companyId]);
+  if (!current?.approved)
+    throw new Error("Empresa sem qualificação atual comprovada");
   const existing = await listExistingLeadIdentities(context.companyId);
   const knownIdentities = new Set(
     existing.map(
@@ -92,7 +105,22 @@ export async function persistResearchedLeads(
       candidate.evidence,
       resultByUrl.keys(),
     );
-    if (!evidence.length) continue;
+    const verified = evidence.filter((item) => {
+      const source = resultByUrl.get(item.sourceUrl);
+      const text = item.content.toLowerCase();
+      return (
+        source &&
+        isRecentEvidence(source.publishedAt ?? "") &&
+        source.content
+          .replace(/\s+/g, " ")
+          .includes(item.content.replace(/\s+/g, " ")) &&
+        text.includes(candidate.name.toLowerCase()) &&
+        text.includes(candidate.title.toLowerCase()) &&
+        text.includes(context.companyName.toLowerCase())
+      );
+    });
+    if (!verified.length || candidate.employmentStatus !== "confirmado")
+      continue;
 
     if (
       knownIdentities.has(identity) ||
@@ -102,9 +130,14 @@ export async function persistResearchedLeads(
       continue;
     }
 
-    const sourceUrl = evidence[0].sourceUrl;
+    const sourceUrl = verified[0].sourceUrl;
     const sourceTitle = resultByUrl.get(sourceUrl)!.title;
-    const evidenceText = evidence.map((item) => item.content).join("\n");
+    const evidenceText = verified
+      .map(
+        (item) =>
+          `${item.content}\n${resultByUrl.get(item.sourceUrl)!.publishedAt} · ${item.sourceUrl}`,
+      )
+      .join("\n\n");
 
     await db.insert(personas).values({
       companyId: context.companyId,
@@ -114,12 +147,7 @@ export async function persistResearchedLeads(
       sourceUrl,
       sourceTitle,
       evidence: evidenceText,
-      confidence:
-        candidate.employmentStatus === "incerto"
-          ? Math.min(candidate.confidence, 50)
-          : candidate.employmentStatus === "provável"
-            ? Math.min(candidate.confidence, 75)
-            : candidate.confidence,
+      confidence: Math.min(candidate.confidence, 90),
       employmentStatus: candidate.employmentStatus,
       reviewStatus: "Pendente de validação",
       originRunId: runId,

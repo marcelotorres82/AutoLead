@@ -18,7 +18,7 @@ describe("cron", () => {
     const queries = buildSearchQueries(
       "empresas de e-commerce com até 1.000 funcionários",
     );
-    expect(queries).toHaveLength(4);
+    expect(queries).toHaveLength(5);
     expect(queries).toContain(
       "empresas de e-commerce com até 1.000 funcionários Brasil site:linkedin.com/company",
     );

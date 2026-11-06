@@ -41,14 +41,15 @@ export function buildSearchQueries(
 
   if (requested) {
     return [
-      `${requested} empresas com operação no Brasil`,
-      `${requested} "atua no Brasil" OR "opera no Brasil" site oficial`,
+      `${requested} empresas com operação no Brasil número de funcionários integrantes`,
+      `${requested} investimento cloud inteligência artificial transformação digital site oficial`,
+      `${requested} estratégia roadmap tecnologia IA 2027`,
       `${requested} Brasil site:linkedin.com/company`,
-      `${requested} Brasil escritório lojas vagas expansão`,
+      `${requested} Brasil vagas expansão fusão novos contratos ${year}`,
     ];
   }
 
-  const tiers: string[][] = [[], [], [], [], []];
+  const tiers: string[][] = [[], [], [], [], [], []];
 
   for (const vertical of activeVerticals) {
     const subverticals =
@@ -62,6 +63,9 @@ export function buildSearchQueries(
     const negFilter =
       '-banco -fintech -pagamento -adquirente -maquininha -telecom -operadora -ISP -"consultoria de TI" -"serviços gerenciados de TI" -"empresa de tecnologia" -"software house"';
 
+    tiers[5].push(
+      `${baseVertical} estratégia tecnologia inteligência artificial roadmap 2027 ${negFilter}`,
+    );
     // Tier 1: Crescimento recente
     tiers[0].push(
       `${baseVertical} empresas "série A" OR "série B" OR "aporte" OR "funding" ${year} ${negFilter}`,
@@ -88,7 +92,11 @@ export function buildSearchQueries(
     );
   }
 
-  return tiers.flat();
+  return activeVerticals.flatMap((_, index) =>
+    tiers
+      .map((tier) => tier[index])
+      .filter((query): query is string => Boolean(query)),
+  );
 }
 
 export function mergeSearchResults(
@@ -171,7 +179,7 @@ export async function runDailyResearch(
   let activeRunId = runIdOverride;
   let activeStageId: string | undefined;
   try {
-    if (demo || !env.DATABASE_URL)
+    if (demo)
       return {
         status: "completed" as const,
         date,
@@ -182,6 +190,8 @@ export async function runDailyResearch(
         companies: demoCompanies,
       };
 
+    if (!env.DATABASE_URL)
+      throw new Error("DATABASE_URL ausente; pesquisa real não executada");
     const db = getDb();
     const aiProviders = configuredAiProviders();
     if (!env.EXA_API_KEY || !aiProviders.length)
@@ -455,7 +465,13 @@ export async function runDailyResearch(
       provider: providerName,
       estimatedCost: 0,
       errors: [...errors, ...providerErrors],
-      companies: await listCompanies(),
+      qualificationResults: persisted.qualificationResults,
+      companies: (await listCompanies()).filter((company) =>
+        persisted.qualificationResults.some(
+          (result) =>
+            result.domain === company.domain && result.qualification.qualified,
+        ),
+      ),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

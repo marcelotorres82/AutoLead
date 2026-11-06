@@ -1,4 +1,10 @@
 import "server-only";
+import {
+  qualifyCompany,
+  policyForCriteria,
+  isCurrentQualification,
+  type QualificationReport,
+} from "@/lib/high-precision";
 
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -19,7 +25,6 @@ import {
   verticals,
 } from "@/db/schema";
 import {
-  calculateScore,
   dateInSaoPaulo,
   extractEmployeeLimit,
   extractEmployeeUpperBound,
@@ -51,6 +56,7 @@ import { withResearchStage } from "@/lib/research-stage-repository";
 import { refreshCompanyWebsiteIntelligence } from "@/lib/website-intelligence-repository";
 
 type AnalysisMetadata = {
+  qualification?: QualificationReport;
   apiScore: number;
   waapScore: number;
   guardicoreScore: number;
@@ -278,8 +284,12 @@ export async function listCompanies(): Promise<Company[]> {
       opportunityScore: evidenceFirst?.opportunityScore ?? company.score,
       scoringProfileVersion:
         evidenceFirst?.scoringProfileVersion ?? "default-v1",
+      qualification: metadata.qualification,
       qualificationStatus:
-        company.qualificationStatus === "READY" ? "READY" : "NEEDS_RESEARCH",
+        company.qualificationStatus === "READY" &&
+        isCurrentQualification(metadata.qualification)
+          ? "READY"
+          : "NEEDS_RESEARCH",
       websiteSnapshots: websiteFetches.slice(0, 12).map((snapshot, index) => {
         const previous = websiteFetches
           .slice(index + 1)
@@ -400,7 +410,25 @@ export async function persistAnalyzedCompanies(
   let duplicateCount = 0;
   const employeeLimit = extractEmployeeLimit(criteria);
 
+  const qualificationResults: Array<{
+    name: string;
+    domain: string;
+    qualification: QualificationReport;
+  }> = [];
   for (const candidate of candidates) {
+    const qualification = qualifyCompany({
+      name: candidate.name,
+      domain: candidate.domain,
+      claims: candidate.evidence,
+      sources: searchResults,
+      policy: policyForCriteria(criteria),
+    });
+    qualificationResults.push({
+      name: candidate.name,
+      domain: candidate.domain,
+      qualification,
+    });
+    if (!qualification.qualified) continue;
     const employeeUpperBound = extractEmployeeUpperBound(candidate.employees);
     if (
       (criteria && candidate.criteriaMatch === "incompatible") ||
@@ -449,6 +477,7 @@ export async function persistAnalyzedCompanies(
       continue;
     const breakdown = scoreBreakdownSchema.parse(candidate.breakdown);
     const metadata: AnalysisMetadata = {
+      qualification,
       apiScore: candidate.apiScore,
       waapScore: candidate.waapScore,
       guardicoreScore: candidate.guardicoreScore,
@@ -472,7 +501,7 @@ export async function persistAnalyzedCompanies(
     );
     const evidenceRecords = validEvidence.map((item) =>
       buildEvidenceRecord({
-        claim: item.content,
+        claim: item.quote ?? item.content,
         kind: item.kind,
         result: resultByUrl.get(item.sourceUrl)!,
         companyDomain: domain,
@@ -516,10 +545,11 @@ export async function persistAnalyzedCompanies(
         linkedinUrl: linkedinUrl ?? null,
         description: candidate.description,
         suggestedSolution: recommendedSolution,
-        score: calculateScore(breakdown),
+        score: qualification.score,
         recommendation: candidate.recommendation,
         status: "Nova",
-        qualificationStatus: gate.status,
+        qualificationStatus:
+          qualification.qualified && gate.passed ? "READY" : "NEEDS_RESEARCH",
         possibleDuplicate: duplicate.possible,
         demo: false,
         analysisMetadata: metadata,
@@ -622,7 +652,7 @@ export async function persistAnalyzedCompanies(
             companyId: inserted.id,
             sourceId: source.id,
             kind: item.kind,
-            content: item.content,
+            content: item.quote ?? item.content,
             evidenceType: evidenceRecord.type,
             statementKind: evidenceRecord.statementKind,
             excerpt: evidenceRecord.excerpt,
@@ -694,7 +724,7 @@ export async function persistAnalyzedCompanies(
     known.push({ name: candidate.name, domain });
     created += 1;
   }
-  return { created, duplicateCount };
+  return { created, duplicateCount, qualificationResults };
 }
 
 export async function updateCompanyStatus(

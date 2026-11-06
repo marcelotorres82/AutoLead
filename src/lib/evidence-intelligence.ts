@@ -152,7 +152,7 @@ export function calculateFreshnessScore(
 ) {
   if (!publishedAt) return 45;
   const published = new Date(publishedAt);
-  if (Number.isNaN(published.getTime())) return 35;
+  if (Number.isNaN(published.getTime()) || published > now) return 0;
   const days = Math.max(0, (now.getTime() - published.getTime()) / 86_400_000);
   if (days <= 90) return 100;
   if (days <= 365) return 80;
@@ -268,15 +268,22 @@ export function buildEvidenceRecord(input: {
     sourceUrl: input.result.url,
     sourceTitle: input.result.title,
     publisher: normalizeDomain(input.result.url),
-    publishedAt: input.result.publishedAt
-      ? new Date(input.result.publishedAt).toISOString()
-      : undefined,
+    publishedAt:
+      input.result.publishedAt &&
+      Number.isFinite(new Date(input.result.publishedAt).getTime())
+        ? new Date(input.result.publishedAt).toISOString()
+        : undefined,
     collectedAt: now.toISOString(),
     excerpt: input.result.content.slice(0, 600),
     confidence: clamp(sourceQuality * 0.65 + freshnessScore * 0.35),
     sourceQuality,
     freshnessScore,
-    verified: statementKind === "FACT" && sourceQuality >= 55,
+    verified:
+      statementKind === "FACT" &&
+      sourceQuality >= 55 &&
+      input.result.content
+        .replace(/\s+/g, " ")
+        .includes(input.claim.replace(/\s+/g, " ")),
     relevantSolutions: relevantSolutionsFor(
       `${input.claim} ${input.result.title} ${input.result.content}`,
     ),
@@ -285,6 +292,7 @@ export function buildEvidenceRecord(input: {
 
 function weightedMatches(evidence: EvidenceRecord[], regex: RegExp) {
   return evidence.reduce((sum, item) => {
+    if (!item.verified || item.statementKind !== "FACT") return sum;
     if (!regex.test(`${item.claim} ${item.excerpt ?? ""}`)) return sum;
     const directness = item.statementKind === "FACT" ? 1 : 0.45;
     return sum + ((item.confidence + item.freshnessScore) / 200) * directness;

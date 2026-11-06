@@ -1,0 +1,217 @@
+{
+  "executedAt": "2026-11-06T10:17:30.391Z",
+  "collectedAt": "2026-11-06",
+  "mode": "PUBLIC_SOURCE_REPLAY",
+  "method": "Amostra de trechos curtos de fontes públicas reais coletadas pela pesquisa web. Reexecução determinística, sem Exa/Gemini. Não representa pesquisa exaustiva nem validação da pipeline de produção.",
+  "sourceSha256": "9415ae1ed6aee74dabc658e3d99908e34c5aa9d1ce158c2e6ceec873e1b5b4c4",
+  "policy": {
+    "minEmployeesExclusive": 1000,
+    "targetYear": 2027,
+    "recentDays": 365
+  },
+  "assessed": 3,
+  "qualified": 0,
+  "results": [
+    {
+      "name": "Mattos Filho",
+      "domain": "mattosfilho.com.br",
+      "notes": "A página institucional informa mais de 1200 profissionais, mas não informa data original. Não foi localizado compromisso tecnológico explícito com 2027 nesta amostra.",
+      "sources": [
+        {
+          "url": "https://www.mattosfilho.com.br/",
+          "title": "Mattos Filho em números",
+          "content": "+1200 profissionais promovendo impacto positivo nos negócios e na sociedade",
+          "criterion": "headcount",
+          "headcount": 1200
+        },
+        {
+          "url": "https://www.mattosfilho.com.br/tecnologia-e-seguranca-da-informacao/",
+          "title": "Tecnologia e Segurança da informação",
+          "content": "Em 2017, nos tornamos o primeiro escritório full-service do país a implementar o cloud computing.",
+          "criterion": "technology"
+        },
+        {
+          "url": "https://www.mattosfilho.com.br/unico/mattos-filho-latin-lawyer-deal-tracker/",
+          "title": "Crescimento em transações",
+          "content": "Em relação ao ano anterior, o escritório apresentou crescimento de 35%, com 124 operações a mais",
+          "publishedAt": "2026-08-14",
+          "criterion": "growth"
+        }
+      ],
+      "qualification": {
+        "version": "precision-v2",
+        "qualified": false,
+        "score": 25,
+        "evaluatedAt": "2026-11-06T10:17:30.390Z",
+        "policy": {
+          "minEmployeesExclusive": 1000,
+          "targetYear": 2027,
+          "recentDays": 365
+        },
+        "breakdown": {
+          "headcount": {
+            "score": 0,
+            "max": 20,
+            "evidence": []
+          },
+          "technology": {
+            "score": 0,
+            "max": 30,
+            "evidence": []
+          },
+          "growth": {
+            "score": 25,
+            "max": 25,
+            "evidence": [
+              {
+                "criterion": "growth",
+                "quote": "Em relação ao ano anterior, o escritório apresentou crescimento de 35%, com 124 operações a mais",
+                "sourceUrl": "https://www.mattosfilho.com.br/unico/mattos-filho-latin-lawyer-deal-tracker/",
+                "sourceTitle": "Crescimento em transações",
+                "publishedAt": "2026-08-14T00:00:00.000Z",
+                "collectedAt": "2026-11-06T10:17:30.390Z"
+              }
+            ]
+          },
+          "roadmap": {
+            "score": 0,
+            "max": 25,
+            "evidence": []
+          }
+        },
+        "reasons": [
+          "Sem comprovação: headcount",
+          "Sem comprovação: technology",
+          "Sem comprovação: roadmap"
+        ],
+        "rejectedEvidence": [
+          {
+            "sourceUrl": "https://www.mattosfilho.com.br/",
+            "reason": "Data original ausente, inválida ou futura"
+          },
+          {
+            "sourceUrl": "https://www.mattosfilho.com.br/tecnologia-e-seguranca-da-informacao/",
+            "reason": "Data original ausente, inválida ou futura"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Pinheiro Neto Advogados",
+      "domain": "pinheironeto.com.br",
+      "notes": "Trecho indexado do relatório anual 2025 indica adoção de IA. A data precisa de publicação, porte acima de 1000 e roadmap 2027 não foram confirmados nesta amostra.",
+      "sources": [
+        {
+          "url": "https://www.pinheironeto.com.br/Documents/storage/files/2025-relatorio-anual-2026/relatorio-anual-2025.pdf",
+          "title": "Relatório anual 2025 — inovação",
+          "content": "aprimoramos também nosso ecossistema de ferramentas de inteligência artificial generativa.",
+          "criterion": "technology"
+        }
+      ],
+      "qualification": {
+        "version": "precision-v2",
+        "qualified": false,
+        "score": 0,
+        "evaluatedAt": "2026-11-06T10:17:30.391Z",
+        "policy": {
+          "minEmployeesExclusive": 1000,
+          "targetYear": 2027,
+          "recentDays": 365
+        },
+        "breakdown": {
+          "headcount": {
+            "score": 0,
+            "max": 20,
+            "evidence": []
+          },
+          "technology": {
+            "score": 0,
+            "max": 30,
+            "evidence": []
+          },
+          "growth": {
+            "score": 0,
+            "max": 25,
+            "evidence": []
+          },
+          "roadmap": {
+            "score": 0,
+            "max": 25,
+            "evidence": []
+          }
+        },
+        "reasons": [
+          "Sem comprovação: headcount",
+          "Sem comprovação: technology",
+          "Sem comprovação: growth",
+          "Sem comprovação: roadmap"
+        ],
+        "rejectedEvidence": [
+          {
+            "sourceUrl": "https://www.pinheironeto.com.br/Documents/storage/files/2025-relatorio-anual-2026/relatorio-anual-2025.pdf",
+            "reason": "Data original ausente, inválida ou futura"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DLA Piper",
+      "domain": "dlapiper.com",
+      "notes": "Controle negativo: 2027 aparece no nome de um ranking. Isso não comprova projeto tecnológico da firma em 2027. O porte global não pode ser automaticamente atribuído à entidade brasileira.",
+      "sources": [
+        {
+          "url": "https://www.dlapiper.com/en/news/2026/10/dla-piper-earns-powerhouse-recognition-in-bti-litigation-outlook-2027",
+          "title": "Reconhecimento BTI Litigation Outlook 2027",
+          "content": "DLA Piper earns Powerhouse recognition in BTI Litigation Outlook 2027",
+          "publishedAt": "2026-10-05",
+          "criterion": "roadmap"
+        }
+      ],
+      "qualification": {
+        "version": "precision-v2",
+        "qualified": false,
+        "score": 0,
+        "evaluatedAt": "2026-11-06T10:17:30.391Z",
+        "policy": {
+          "minEmployeesExclusive": 1000,
+          "targetYear": 2027,
+          "recentDays": 365
+        },
+        "breakdown": {
+          "headcount": {
+            "score": 0,
+            "max": 20,
+            "evidence": []
+          },
+          "technology": {
+            "score": 0,
+            "max": 30,
+            "evidence": []
+          },
+          "growth": {
+            "score": 0,
+            "max": 25,
+            "evidence": []
+          },
+          "roadmap": {
+            "score": 0,
+            "max": 25,
+            "evidence": []
+          }
+        },
+        "reasons": [
+          "Sem comprovação: headcount",
+          "Sem comprovação: technology",
+          "Sem comprovação: growth",
+          "Sem comprovação: roadmap"
+        ],
+        "rejectedEvidence": [
+          {
+            "sourceUrl": "https://www.dlapiper.com/en/news/2026/10/dla-piper-earns-powerhouse-recognition-in-bti-litigation-outlook-2027",
+            "reason": "Sem projeto tecnológico explícito para 2027"
+          }
+        ]
+      }
+    }
+  ]
+}

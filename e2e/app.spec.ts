@@ -1,4 +1,27 @@
 import { test, expect } from "@playwright/test";
+for (const width of [320, 390, 767]) {
+  test(`mobile: cards e filtros acessíveis em ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/companies");
+    await expect(page.getByRole("table")).toBeHidden();
+    await expect(
+      page.getByRole("navigation", { name: "Navegação rápida" }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width);
+    const trigger = page.getByRole("button", { name: "Filtros e ações" });
+    await trigger.click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page
+      .getByRole("dialog")
+      .getByLabel("Filtrar por nome ou domínio")
+      .fill("Aurora");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+}
 test.beforeEach(async ({ page }) => {
   await page.goto("/login");
   await page.waitForLoadState("networkidle");
@@ -39,7 +62,9 @@ test("pesquisa, filtros e status", async ({ page }) => {
   await page.getByRole("button", { name: "Pesquisar com IA" }).click();
   await expect(page.getByText("Pesquisa demo concluída")).toBeVisible();
   await page.getByPlaceholder("Filtrar por nome ou domínio").fill("Aurora");
-  await expect(page.getByText(/Aurora Mercado Digital/)).toBeVisible();
+  await expect(
+    page.getByRole("table").getByText(/Aurora Mercado Digital/),
+  ).toBeVisible();
   await page.getByLabel(/Aprovar Aurora/).click();
   await expect(
     page.getByRole("cell", { name: "Aprovada para pesquisar leads" }),

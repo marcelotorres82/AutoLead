@@ -1,4 +1,8 @@
 import "server-only";
+import {
+  isCurrentQualification,
+  type QualificationReport,
+} from "@/lib/high-precision";
 
 import { createHash } from "node:crypto";
 import { desc, eq } from "drizzle-orm";
@@ -17,7 +21,15 @@ export async function queueCompanyForCrm(
     .where(eq(companies.id, companyId))
     .limit(1);
   if (!row) throw new Error("Empresa não encontrada");
+  const qualification = (
+    row.company.analysisMetadata as {
+      qualification?: QualificationReport;
+    } | null
+  )?.qualification;
+  if (!isCurrentQualification(qualification))
+    throw new Error("Empresa sem qualificação atual comprovada");
   const payload = {
+    qualification,
     companyId,
     name: row.company.name,
     domain: row.company.domain,
@@ -55,6 +67,17 @@ export async function listCrmOutbox(limit = 100) {
 }
 
 export async function approveCrmOutboxItem(id: string, actor: string) {
+  const [current] = await getDb()
+    .select({ metadata: companies.analysisMetadata })
+    .from(crmOutbox)
+    .innerJoin(companies, eq(companies.id, crmOutbox.companyId))
+    .where(eq(crmOutbox.id, id))
+    .limit(1);
+  const qualification = (
+    current?.metadata as { qualification?: QualificationReport } | null
+  )?.qualification;
+  if (!isCurrentQualification(qualification))
+    throw new Error("Qualificação ausente ou vencida; pesquise novamente");
   const [item] = await getDb()
     .update(crmOutbox)
     .set({

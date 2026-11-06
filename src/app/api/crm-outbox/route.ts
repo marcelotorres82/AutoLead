@@ -23,13 +23,22 @@ export async function POST(request: Request) {
     .safeParse(await request.json().catch(() => null));
   if (!parsed.success)
     return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
-  return NextResponse.json(
-    {
-      item: await queueCompanyForCrm(
-        parsed.data.companyId,
-        parsed.data.destination,
-      ),
-    },
-    { status: 202 },
-  );
+  try {
+    return NextResponse.json(
+      {
+        item: await queueCompanyForCrm(
+          parsed.data.companyId,
+          parsed.data.destination,
+        ),
+      },
+      { status: 202 },
+    );
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Falha na qualificação",
+      },
+      { status: 409 },
+    );
+  }
 }

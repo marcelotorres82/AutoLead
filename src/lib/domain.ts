@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { QualificationReport } from "@/lib/high-precision";
 
 export const companyStatuses = [
   "Nova",
@@ -19,7 +20,11 @@ export const solutions = ["API Security", "WAAP", "Guardicore"] as const;
 export type Solution = (typeof solutions)[number];
 
 export const verticalTaxonomy = {
-  "Business Services": ["Agências de publicidade e marketing", "Logística"],
+  "Business Services": [
+    "Agências de publicidade e marketing",
+    "Logística",
+    "Escritórios de advocacia e serviços jurídicos",
+  ],
   Education: [
     "Ensino básico/K-12",
     "Universidades",
@@ -161,6 +166,7 @@ export const companySchema = z.object({
   confidenceScore: z.number().min(0).max(100).optional(),
   opportunityScore: z.number().min(0).max(100).optional(),
   scoringProfileVersion: z.string().optional(),
+  qualification: z.custom<QualificationReport>().optional(),
   qualificationStatus: z.enum(["NEEDS_RESEARCH", "READY"]).optional(),
   websiteSnapshots: z
     .array(
@@ -204,6 +210,13 @@ export function dateInSaoPaulo(value: Date = new Date()) {
 export type Company = z.infer<typeof companySchema>;
 
 export const analyzedEvidenceSchema = z.object({
+  criterion: z
+    .enum(["headcount", "technology", "growth", "roadmap"])
+    .nullable()
+    .optional(),
+  quote: z.string().min(30).max(1200).nullable().optional(),
+  publishedAt: z.string().nullable().optional(),
+  headcount: z.number().int().positive().nullable().optional(),
   kind: z.enum(["fact", "signal", "hypothesis"]),
   content: z.string().min(10).max(600),
   // OpenAI Structured Outputs rejects the JSON Schema `uri` format.

@@ -7,14 +7,18 @@ const variants = cva(
   {
     variants: {
       variant: {
-        default: "bg-cyan-600 text-white hover:bg-cyan-700",
+        default: "bg-cyan-700 text-white hover:bg-cyan-800",
         outline:
           "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200",
         ghost:
           "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
         danger: "bg-red-600 text-white hover:bg-red-700",
       },
-      size: { default: "h-10 px-4", sm: "h-8 px-3 text-xs", icon: "size-10" },
+      size: {
+        default: "min-h-11 px-4 py-2",
+        sm: "min-h-11 px-3 text-xs",
+        icon: "size-11 shrink-0",
+      },
     },
     defaultVariants: { variant: "default", size: "default" },
   },

@@ -1,4 +1,8 @@
 import "server-only";
+import {
+  isCurrentQualification,
+  type QualificationReport,
+} from "@/lib/high-precision";
 
 import { createHash } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
@@ -47,6 +51,7 @@ export async function refreshCompanyWebsiteIntelligence(
       name: companies.name,
       domain: companies.domain,
       vertical: verticals.name,
+      analysisMetadata: companies.analysisMetadata,
     })
     .from(companies)
     .leftJoin(verticals, eq(companies.verticalId, verticals.id))
@@ -282,6 +287,14 @@ export async function refreshCompanyWebsiteIntelligence(
   const scores = applyScoringProfile(baseScores, company.vertical ?? "");
   const solution = recommendedSolutionFromScores(scores);
   const gate = passesEvidenceGate(scores, evidence, solution);
+  const qualification = (
+    company.analysisMetadata as { qualification?: QualificationReport } | null
+  )?.qualification;
+  if (!isCurrentQualification(qualification)) {
+    gate.passed = false;
+    gate.status = "NEEDS_RESEARCH";
+    gate.reasons.push("Qualificação de alta precisão ausente ou vencida");
+  }
   const [profile] = await db
     .select({ id: scoringProfiles.id })
     .from(scoringProfiles)
@@ -331,7 +344,9 @@ export async function refreshCompanyWebsiteIntelligence(
     .update(companies)
     .set({
       suggestedSolution: solution,
-      score: scores.opportunityScore,
+      score: isCurrentQualification(qualification)
+        ? qualification!.score
+        : Math.min(scores.opportunityScore, 25),
       qualificationStatus: gate.status,
       updatedAt: new Date(),
     })

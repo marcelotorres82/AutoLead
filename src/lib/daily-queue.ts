@@ -1,4 +1,8 @@
 import "server-only";
+import {
+  isCurrentQualification,
+  type QualificationReport,
+} from "@/lib/high-precision";
 
 import { and, desc, eq, isNull, lte, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -50,6 +54,12 @@ function isEligibleQueueCompany(company: {
     company.analysisMetadata && typeof company.analysisMetadata === "object"
       ? (company.analysisMetadata as Record<string, unknown>)
       : {};
+  if (
+    !isCurrentQualification(
+      metadata.qualification as QualificationReport | undefined,
+    )
+  )
+    return false;
   const text = (key: string) =>
     typeof metadata[key] === "string" ? metadata[key] : undefined;
 

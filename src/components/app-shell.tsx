@@ -17,9 +17,9 @@ import {
   Sun,
   Tags,
   Users,
-  X,
 } from "lucide-react";
 import { useState } from "react";
+import { MobileSheet } from "@/components/mobile-sheet";
 import { useDemoStore } from "@/components/demo-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,9 @@ import { countsTowardGoal, dateInSaoPaulo } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
 const nav = [
+  { href: "/daily-queue", label: "Fila diária", icon: Users },
+  { href: "/crm-outbox", label: "Fila CRM", icon: Building2 },
+  { href: "/validation", label: "Validação jurídica", icon: Search },
   { href: "/dashboard", label: "Visão geral", icon: BarChart3 },
   { href: "/research", label: "Pesquisa diária", icon: CalendarSearch },
   { href: "/companies", label: "Empresas", icon: Building2 },
@@ -115,32 +118,47 @@ export function AppShell({
   );
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:z-50 focus:bg-white focus:p-4 focus:text-slate-950"
+      >
+        Pular para o conteúdo
+      </a>
       <div className="fixed inset-y-0 left-0 hidden lg:block">{sidebar}</div>
-      {open ? (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          <div className="relative z-10">{sidebar}</div>
-          <button
-            aria-label="Fechar menu"
-            className="flex-1 bg-black/50"
-            onClick={() => setOpen(false)}
-          >
-            <X className="absolute right-4 top-4 text-white" />
-          </button>
-        </div>
-      ) : null}
       <div className="lg:pl-64">
         <header className="sticky top-0 z-30 flex h-20 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 md:px-7">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
-            onClick={() => setOpen(true)}
-            aria-label="Abrir menu"
+          <MobileSheet
+            open={open}
+            onOpenChange={setOpen}
+            title="Navegação"
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden"
+                aria-label="Abrir menu"
+              >
+                <Menu />
+              </Button>
+            }
           >
-            <Menu />
-          </Button>
+            <nav className="grid gap-1">
+              {nav.map(({ href, label, icon: Icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  aria-current={path.startsWith(href) ? "page" : undefined}
+                  className="flex min-h-11 items-center gap-3 rounded-xl p-3 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <Icon className="size-5" />
+                  {label}
+                </Link>
+              ))}
+            </nav>
+          </MobileSheet>
           <form
-            className="relative max-w-md flex-1"
+            className="relative min-w-0 max-w-md flex-1"
             onSubmit={(event) => {
               event.preventDefault();
               const trimmed = globalQuery.trim();
@@ -204,7 +222,35 @@ export function AppShell({
             <LogOut />
           </Button>
         </header>
-        <main className="p-4 md:p-7">{children}</main>
+        <nav
+          aria-label="Navegação rápida"
+          className="mobile-nav fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t bg-white/95 px-2 pt-2 backdrop-blur dark:bg-slate-950/95 lg:hidden"
+        >
+          {[
+            { href: "/dashboard", label: "Início", icon: BarChart3 },
+            { href: "/research", label: "Pesquisar", icon: Search },
+            { href: "/companies", label: "Empresas", icon: Building2 },
+            { href: "/daily-queue", label: "Fila", icon: Users },
+          ].map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              aria-current={path.startsWith(href) ? "page" : undefined}
+              className={cn(
+                "flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-xs font-semibold",
+                path.startsWith(href)
+                  ? "bg-cyan-100 text-cyan-900 dark:bg-cyan-950 dark:text-cyan-200"
+                  : "text-slate-600 dark:text-slate-300",
+              )}
+            >
+              <Icon className="size-5" />
+              {label}
+            </Link>
+          ))}
+        </nav>
+        <main id="main-content" className="min-w-0 p-4 pb-28 md:p-7 lg:pb-7">
+          {children}
+        </main>
       </div>
     </div>
   );

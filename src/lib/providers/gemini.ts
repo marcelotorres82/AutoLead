@@ -136,10 +136,8 @@ export class GeminiAiProvider implements AiProvider {
     const apiKey = env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY não configurada");
     const selected = results.slice(0, 50);
-    const chunkSize = Math.ceil(selected.length / 3);
-    const chunks = Array.from({ length: 3 }, (_, index) =>
-      selected.slice(index * chunkSize, (index + 1) * chunkSize),
-    ).filter((chunk) => chunk.length > 0);
+    // Keep corroborating sources together: splitting by rank loses company evidence.
+    const chunks = selected.length ? [selected] : [];
     const settled = await Promise.allSettled(
       chunks.map((chunk) =>
         this.analyzeChunk(chunk, apiKey, criteria, inventory),

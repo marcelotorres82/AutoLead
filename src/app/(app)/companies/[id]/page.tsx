@@ -1,4 +1,5 @@
 "use client";
+import { QualificationPanel } from "@/components/qualification-panel";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import {
@@ -53,6 +54,9 @@ export default function CompanyDetail() {
   ];
   return (
     <>
+      <div className="mb-6">
+        <QualificationPanel report={c.qualification} />
+      </div>
       <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
           <div className="flex flex-wrap gap-2">
