@@ -466,12 +466,7 @@ export async function runDailyResearch(
       estimatedCost: 0,
       errors: [...errors, ...providerErrors],
       qualificationResults: persisted.qualificationResults,
-      companies: (await listCompanies()).filter((company) =>
-        persisted.qualificationResults.some(
-          (result) =>
-            result.domain === company.domain && result.qualification.qualified,
-        ),
-      ),
+      companies: await listCompanies(),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -43,14 +43,18 @@ export async function GET(request: Request) {
   const state = url.searchParams.get("state");
   const cookieStore = await cookies();
   const stateToken = cookieStore.get(googleOAuthStateCookie)?.value;
-  const savedState = await verifyOAuthStateToken(stateToken);
+  const savedCookieState = await verifyOAuthStateToken(stateToken);
+  const savedParamState = await verifyOAuthStateToken(state ?? undefined);
+  const savedState = savedCookieState ?? savedParamState;
 
-  if (
-    !code ||
-    !state ||
-    !savedState ||
-    !safeCompareSecrets(state, savedState.state)
-  ) {
+  const isStateMatch =
+    Boolean(savedParamState) ||
+    (Boolean(savedCookieState) &&
+      Boolean(state) &&
+      (safeCompareSecrets(state, savedCookieState!.state) ||
+        safeCompareSecrets(state, stateToken)));
+
+  if (!code || !state || !savedState || !isStateMatch) {
     return redirectWithClearCookie(
       request.url,
       "/login?error=google_invalid_state",

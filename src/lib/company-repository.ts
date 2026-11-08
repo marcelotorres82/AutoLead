@@ -428,7 +428,6 @@ export async function persistAnalyzedCompanies(
       domain: candidate.domain,
       qualification,
     });
-    if (!qualification.qualified) continue;
     const employeeUpperBound = extractEmployeeUpperBound(candidate.employees);
     if (
       (criteria && candidate.criteriaMatch === "incompatible") ||

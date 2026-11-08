@@ -3,6 +3,9 @@ import { sessionCookie, verifySession } from "@/lib/auth";
 
 const protectedPrefixes = [
   "/dashboard",
+  "/daily-queue",
+  "/crm-outbox",
+  "/validation",
   "/research",
   "/companies",
   "/personas",

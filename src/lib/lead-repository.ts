@@ -48,7 +48,7 @@ export async function getLeadResearchContexts(companyIds: string[]) {
       subsegment: row.subsegment ?? undefined,
       titles: metadata.titles ?? [],
       approved:
-        row.status === "Aprovada para pesquisar leads" &&
+        row.status === "Aprovada para pesquisar leads" ||
         isCurrentQualification(metadata.qualification),
     } satisfies LeadResearchContext & {
       approved: boolean;

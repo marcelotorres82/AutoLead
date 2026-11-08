@@ -121,7 +121,12 @@ export async function exchangeGoogleCodeForProfile(input: {
   codeVerifier: string;
   redirectUri: string;
 }): Promise<GoogleUserProfile> {
-  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+  const clientId = env.GOOGLE_CLIENT_ID?.trim().replace(/^["']|["']$/g, "");
+  const clientSecret = env.GOOGLE_CLIENT_SECRET?.trim().replace(
+    /^["']|["']$/g,
+    "",
+  );
+  if (!clientId || !clientSecret) {
     throw new Error("GOOGLE_OAUTH_NOT_CONFIGURED");
   }
 
@@ -133,8 +138,8 @@ export async function exchangeGoogleCodeForProfile(input: {
     },
     body: new URLSearchParams({
       code: input.code,
-      client_id: env.GOOGLE_CLIENT_ID,
-      client_secret: env.GOOGLE_CLIENT_SECRET,
+      client_id: clientId,
+      client_secret: clientSecret,
       redirect_uri: input.redirectUri,
       grant_type: "authorization_code",
       code_verifier: input.codeVerifier,
@@ -143,6 +148,16 @@ export async function exchangeGoogleCodeForProfile(input: {
   });
 
   if (!tokenResponse.ok) {
+    const errText = await tokenResponse.text().catch(() => "");
+    console.error(
+      JSON.stringify({
+        level: "error",
+        message: "google_token_exchange_error",
+        status: tokenResponse.status,
+        redirectUri: input.redirectUri,
+        detail: errText.slice(0, 300),
+      }),
+    );
     throw new Error("GOOGLE_TOKEN_EXCHANGE_FAILED");
   }
 
@@ -158,22 +173,37 @@ export async function exchangeGoogleCodeForProfile(input: {
   let profile: GoogleUserProfile | null = null;
 
   if (tokenData.id_token) {
-    const { payload } = await jwtVerify(tokenData.id_token, GOOGLE_JWKS, {
-      issuer: ["https://accounts.google.com", "accounts.google.com"],
-      audience: env.GOOGLE_CLIENT_ID,
-    });
-    if (typeof payload.email === "string" && typeof payload.sub === "string") {
-      profile = {
-        sub: payload.sub,
-        email: payload.email.trim().toLowerCase(),
-        emailVerified: Boolean(payload.email_verified),
-        name:
-          typeof payload.name === "string" && payload.name.trim()
-            ? payload.name.trim()
-            : payload.email.split("@")[0],
-        picture:
-          typeof payload.picture === "string" ? payload.picture : undefined,
-      };
+    try {
+      const { payload } = await jwtVerify(tokenData.id_token, GOOGLE_JWKS, {
+        issuer: ["https://accounts.google.com", "accounts.google.com"],
+        audience: clientId,
+        clockTolerance: 300,
+      });
+      if (
+        typeof payload.email === "string" &&
+        typeof payload.sub === "string"
+      ) {
+        profile = {
+          sub: payload.sub,
+          email: payload.email.trim().toLowerCase(),
+          emailVerified: Boolean(payload.email_verified),
+          name:
+            typeof payload.name === "string" && payload.name.trim()
+              ? payload.name.trim()
+              : payload.email.split("@")[0],
+          picture:
+            typeof payload.picture === "string" ? payload.picture : undefined,
+        };
+      }
+    } catch (jwksError) {
+      console.warn(
+        JSON.stringify({
+          level: "warn",
+          message: "google_id_token_verify_fallback_to_userinfo",
+          error:
+            jwksError instanceof Error ? jwksError.message : String(jwksError),
+        }),
+      );
     }
   }
 

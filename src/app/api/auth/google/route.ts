@@ -34,9 +34,9 @@ export async function GET(request: Request) {
   });
 
   const authorizationUrl = buildGoogleAuthorizationUrl({
-    clientId: env.GOOGLE_CLIENT_ID,
+    clientId: env.GOOGLE_CLIENT_ID.trim().replace(/^["']|["']$/g, ""),
     redirectUri,
-    state,
+    state: stateToken,
     codeChallenge,
   });
 

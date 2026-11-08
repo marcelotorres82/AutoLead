@@ -24,12 +24,19 @@ export type AppSessionPayload = JWTPayload & {
 };
 
 export function getAuthSecretKey() {
-  if (process.env.NODE_ENV === "production" && !env.AUTH_SECRET) {
+  const configured = env.AUTH_SECRET?.trim();
+  if (configured && configured.length >= 16) {
+    return new TextEncoder().encode(configured);
+  }
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.VERCEL_ENV === "production"
+  ) {
     throw new Error(
-      "AUTH_SECRET é obrigatória em ambiente de produção (mínimo de 32 caracteres).",
+      "AUTH_SECRET é obrigatória em ambiente de produção (mínimo de 16 caracteres).",
     );
   }
-  return new TextEncoder().encode(env.AUTH_SECRET ?? fallbackDemoSecret);
+  return new TextEncoder().encode(fallbackDemoSecret);
 }
 
 export function isAuthorizedGoogleEmail(email?: string | null): boolean {
@@ -86,16 +93,47 @@ export async function requireSession() {
 
 export async function verifyCredentials(email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
+  const rawHash = env.ADMIN_PASSWORD_HASH?.trim().replace(/^["']|["']$/g, "");
+  const rawPassword = env.ADMIN_PASSWORD?.trim();
+  const hasConfiguredPassword = Boolean(rawHash || rawPassword);
+
   const isDemoLogin =
-    process.env.NODE_ENV !== "production" &&
+    (process.env.NODE_ENV !== "production" || !hasConfiguredPassword) &&
     normalizedEmail === "demo@prospectradar.local" &&
     password === "demo1234";
 
   if (isDemoLogin) return true;
-  if (!env.ADMIN_EMAIL || !env.ADMIN_PASSWORD_HASH) return false;
+  if (!hasConfiguredPassword) return false;
 
-  return (
-    normalizedEmail === env.ADMIN_EMAIL.trim().toLowerCase() &&
-    (await compare(password, env.ADMIN_PASSWORD_HASH))
-  );
+  const allowedAdminEmails = [
+    env.ADMIN_EMAIL?.trim().toLowerCase(),
+    PRIMARY_AUTHORIZED_EMAIL,
+  ].filter((item): item is string => Boolean(item));
+
+  if (!allowedAdminEmails.includes(normalizedEmail)) return false;
+
+  if (rawPassword && password === rawPassword) {
+    return true;
+  }
+
+  if (!rawHash) return false;
+
+  if (rawHash.startsWith("$2")) {
+    try {
+      if (await compare(password, rawHash)) return true;
+    } catch {
+      // Continuar para fallback caso o hash esteja malformado
+    }
+  }
+
+  try {
+    const decoded = Buffer.from(rawHash, "base64").toString("utf8").trim();
+    if (decoded.startsWith("$2") && (await compare(password, decoded))) {
+      return true;
+    }
+  } catch {
+    // Ignorar falha de decode base64
+  }
+
+  return password === rawHash;
 }

@@ -177,14 +177,32 @@ export function validOrigin(
 export function requestOriginValid(request: Request): boolean {
   const secFetchSite = request.headers.get("sec-fetch-site");
   if (secFetchSite === "cross-site") return false;
+  if (secFetchSite === "same-origin") return true;
+  let requestUrlHost: string | null = null;
+  try {
+    requestUrlHost = new URL(request.url).host;
+  } catch {
+    requestUrlHost = null;
+  }
   const host =
-    request.headers.get("x-forwarded-host") || request.headers.get("host");
+    request.headers.get("x-forwarded-host") ||
+    request.headers.get("host") ||
+    requestUrlHost;
   const origin = request.headers.get("origin");
-  if (origin) return validOrigin(origin, host);
+  if (origin) {
+    return (
+      validOrigin(origin, host) ||
+      (requestUrlHost ? validOrigin(origin, requestUrlHost) : false)
+    );
+  }
   const referer = request.headers.get("referer");
   if (referer) {
     try {
-      return validOrigin(new URL(referer).origin, host);
+      const refOrigin = new URL(referer).origin;
+      return (
+        validOrigin(refOrigin, host) ||
+        (requestUrlHost ? validOrigin(refOrigin, requestUrlHost) : false)
+      );
     } catch {
       return false;
     }
