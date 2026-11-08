@@ -115,20 +115,18 @@ describe("Gemini", () => {
     expect(analyzed).toHaveLength(1);
     expect(analyzed[0].breakdown.evidenceQuality).toBe(5);
     const request = JSON.parse(fetchMock.mock.calls[0][1].body as string);
-    expect(request.generationConfig.thinkingConfig).toEqual({
-      thinkingBudget: 0,
-    });
+    expect(fetchMock.mock.calls[0][0]).toContain("gemini-3.5-flash-lite:");
     expect(request.contents[0].parts[0].text).toContain(
       "empresas com até 500 funcionários",
     );
   });
 
-  it("faz fallback automático de modelo quando o modelo principal retorna 503", async () => {
+  it("faz fallback automático de modelo quando o modelo principal retorna 404 ou 503", async () => {
     env.GEMINI_API_KEY = "test-key";
     let callCount = 0;
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       callCount += 1;
-      if (url.includes("gemini-2.5-flash:")) {
+      if (url.includes("gemini-3.5-flash-lite:")) {
         return Promise.resolve(
           new Response(
             JSON.stringify({
@@ -137,7 +135,7 @@ describe("Gemini", () => {
                   "This model is currently experiencing high demand. Please try again later.",
               },
             }),
-            { status: 503 },
+            { status: 404 },
           ),
         );
       }
@@ -164,8 +162,8 @@ describe("Gemini", () => {
 
     expect(analyzed).toEqual([]);
     expect(callCount).toBe(2);
-    expect(fetchMock.mock.calls[0][0]).toContain("gemini-2.5-flash:");
-    expect(fetchMock.mock.calls[1][0]).toContain("gemini-2.5-flash-lite:");
+    expect(fetchMock.mock.calls[0][0]).toContain("gemini-3.5-flash-lite:");
+    expect(fetchMock.mock.calls[1][0]).toContain("gemini-3.5-flash:");
   });
 
   it("normaliza quote curta e headcount zero sem derrubar o lote nem chamar gemini-2.0-flash-lite", async () => {

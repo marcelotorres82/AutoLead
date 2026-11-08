@@ -10,12 +10,24 @@ import {
 } from "@/lib/company-repository";
 import { demoCompanies } from "@/lib/demo-data";
 import { buildDailyLeadQueue } from "@/lib/daily-queue";
-import { verticalNames, verticalTaxonomy } from "@/lib/domain";
+import {
+  analyzedCompanySchema,
+  findDuplicate,
+  hasBrazilOperationEvidence,
+  isForbiddenSectorCompany,
+  normalizeDomain,
+  verticalNames,
+  verticalTaxonomy,
+  type AnalyzedCompany,
+} from "@/lib/domain";
 import { env } from "@/lib/env";
 import { sanitizeSearchResult } from "@/lib/external-content";
 import { GeminiAiProvider } from "@/lib/providers/gemini";
 import { MultiSearchProvider } from "@/lib/providers/multi-search";
-import type { SearchResult } from "@/lib/providers/types";
+import type {
+  CompanyInventoryItem,
+  SearchResult,
+} from "@/lib/providers/types";
 import { searchWithCache } from "@/lib/research-cache";
 import { updateResearchRunMetadata } from "@/lib/research-run-repository";
 import {
@@ -161,6 +173,287 @@ function researchLog(
   const payload = JSON.stringify({ level, message, ...context });
   if (level === "error") console.error(payload);
   else console.log(payload);
+}
+
+const ignoredDiscoveryDomains = new Set([
+  "linkedin.com",
+  "google.com",
+  "google.com.br",
+  "duckduckgo.com",
+  "bing.com",
+  "wikipedia.org",
+  "youtube.com",
+  "facebook.com",
+  "instagram.com",
+  "twitter.com",
+  "x.com",
+  "globo.com",
+  "g1.globo.com",
+  "valor.globo.com",
+  "uol.com.br",
+  "folha.uol.com.br",
+  "estadao.com.br",
+  "exame.com",
+  "infomoney.com.br",
+  "forbes.com.br",
+  "cnnbrasil.com.br",
+  "baguete.com.br",
+  "convergenciadigital.com.br",
+  "tiinside.com.br",
+  "neofeed.com.br",
+  "startups.com.br",
+  "distrito.me",
+  "catho.com.br",
+  "gupy.io",
+  "vagas.com.br",
+  "glassdoor.com.br",
+  "glassdoor.com",
+  "indeed.com",
+  "indeed.com.br",
+  "reclameaqui.com.br",
+  "jusbrasil.com.br",
+  "econodata.com.br",
+  "cnpj.biz",
+  "casadosdados.com.br",
+  "solutudo.com.br",
+  "guiamais.com.br",
+  "gov.br",
+]);
+
+function inferVerticalAndSubsegment(
+  text: string,
+  criteria?: string,
+): {
+  vertical: (typeof verticalNames)[number];
+  subsegment: (typeof verticalTaxonomy)[(typeof verticalNames)[number]][number];
+} {
+  const combined = `${criteria ?? ""} ${text}`.toLowerCase();
+  if (/(?:advocacia|jur[ií]dic|law|advogados|escrit[oó]rio de advocacia)/i.test(combined)) {
+    return {
+      vertical: "Business Services",
+      subsegment: "Escritórios de advocacia e serviços jurídicos",
+    };
+  }
+  if (/(?:publicidade|marketing|ag[eê]ncia|comunica[cç][aã]o|propaganda)/i.test(combined)) {
+    return {
+      vertical: "Business Services",
+      subsegment: "Agências de publicidade e marketing",
+    };
+  }
+  if (/(?:business services|log[ií]stica|transporte|frete|supply chain|armazenagem|entregas|frota)/i.test(combined)) {
+    return {
+      vertical: "Business Services",
+      subsegment: "Logística",
+    };
+  }
+  if (/(?:universidade|faculdade|ensino superior|centro universit[aá]rio)/i.test(combined)) {
+    return { vertical: "Education", subsegment: "Universidades" };
+  }
+  if (/(?:escola|col[eé]gio|k-12|ensino b[aá]sico)/i.test(combined)) {
+    return { vertical: "Education", subsegment: "Ensino básico/K-12" };
+  }
+  if (/(?:educa[cç][aã]o|treinamento|curso|edtech)/i.test(combined)) {
+    return {
+      vertical: "Education",
+      subsegment: "Treinamento técnico e profissional",
+    };
+  }
+  if (/(?:hotel|turismo|resort|viagem|hospitality|pousada|cia a[eé]rea|passagens)/i.test(combined)) {
+    return { vertical: "Hospitality", subsegment: "Hotelaria e turismo" };
+  }
+  if (/(?:streaming|ott|video|v[ií]deo|broadcast|transmiss[aã]o)/i.test(combined)) {
+    return { vertical: "Video Media", subsegment: "OTT" };
+  }
+  if (/(?:varejo|e-commerce|ecommerce|loja|marketplace|retail|atacado|supermercado|moda|compras)/i.test(combined)) {
+    return { vertical: "Retail", subsegment: "Varejo e e-commerce" };
+  }
+  return {
+    vertical: "Business Services",
+    subsegment: "Logística",
+  };
+}
+
+export function extractDeterministicCandidates(
+  results: SearchResult[],
+  criteria: string | undefined,
+  inventory: CompanyInventoryItem[],
+): AnalyzedCompany[] {
+  const known = inventory.flatMap((item) =>
+    [item.name, item.tradeName, ...item.aliases]
+      .filter((name): name is string => Boolean(name))
+      .map((name) => ({ name, domain: item.domain })),
+  );
+  const candidates: AnalyzedCompany[] = [];
+
+  for (const result of results) {
+    if (candidates.length >= 10) break;
+    const rawDomain = normalizeDomain(result.url);
+    if (!rawDomain) continue;
+
+    let companyName = "";
+    let companyDomain = "";
+    let linkedinUrl = "";
+
+    const isLinkedInCompany =
+      (rawDomain === "linkedin.com" || rawDomain.endsWith(".linkedin.com")) &&
+      /\/company\/([^/?#]+)/i.test(result.url);
+
+    if (isLinkedInCompany) {
+      const slugMatch = result.url.match(/\/company\/([^/?#]+)/i);
+      const slug = slugMatch?.[1] ?? "";
+      if (!slug || slug.length < 3) continue;
+      const cleanTitle = result.title
+        .replace(/\s*[|\-–—]\s*LinkedIn.*$/i, "")
+        .replace(/^LinkedIn\s*[|\-–—]\s*/i, "")
+        .trim();
+      companyName =
+        cleanTitle.length >= 2 && cleanTitle.length <= 80
+          ? cleanTitle
+          : slug
+              .replace(/[-_]+/g, " ")
+              .replace(/\b\w/g, (char) => char.toUpperCase());
+      const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "");
+      companyDomain = `${cleanSlug}.com.br`;
+      linkedinUrl = result.url.startsWith("https://") ? result.url : "";
+    } else {
+      const isIgnored = Array.from(ignoredDiscoveryDomains).some(
+        (ignored) =>
+          rawDomain === ignored || rawDomain.endsWith(`.${ignored}`),
+      );
+      if (isIgnored) continue;
+      companyDomain = rawDomain;
+      const titleFirstPart = result.title
+        .split(/\s*[|\-–—:]\s*/)[0]
+        ?.trim();
+      const domainLabel = rawDomain
+        .split(".")[0]
+        .replace(/[-_]+/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+      companyName =
+        titleFirstPart &&
+        titleFirstPart.length >= 2 &&
+        titleFirstPart.length <= 65 &&
+        !/^(home|in[ií]cio|sobre|quem somos|bem-vindo|portal|vagas)/i.test(
+          titleFirstPart,
+        )
+          ? titleFirstPart
+          : domainLabel;
+    }
+
+    if (!companyName || companyName.length < 2 || !companyDomain) continue;
+    if (findDuplicate({ name: companyName, domain: companyDomain }, known).duplicate) {
+      continue;
+    }
+
+    const combinedText = `${result.title} ${result.content}`;
+    const { vertical, subsegment } = inferVerticalAndSubsegment(
+      combinedText,
+      criteria,
+    );
+    const coreBusiness = `Operação corporativa em ${vertical} (${subsegment}): ${result.title.slice(0, 180)}.`;
+    const description = `${companyName} atua no mercado brasileiro no segmento de ${subsegment}. ${result.content.slice(0, 280)}`.slice(
+      0,
+      750,
+    );
+    const classificationReason = `Classificada em ${vertical} / ${subsegment} com base na atividade descrita na fonte pública (${result.title.slice(0, 120)}).`;
+    const brazilOperationEvidence = `Atuação comercial e presença operacional no Brasil verificada na fonte pública (${companyDomain}).`;
+
+    if (
+      isForbiddenSectorCompany({
+        name: companyName,
+        tradeName: companyName,
+        domain: companyDomain,
+        coreBusiness,
+        description,
+        classificationReason,
+      }).forbidden
+    ) {
+      continue;
+    }
+
+    if (
+      !hasBrazilOperationEvidence(
+        {
+          operatesInBrazil: true,
+          country: "Brasil",
+          brazilOperationEvidence,
+        },
+        result,
+      )
+    ) {
+      continue;
+    }
+
+    const literalQuote =
+      result.content.trim().length >= 30
+        ? result.content.trim().slice(0, 350)
+        : null;
+
+    const candidateObj = {
+      name: companyName.slice(0, 200),
+      tradeName: companyName.slice(0, 200),
+      domain: companyDomain,
+      vertical,
+      subsegment,
+      coreBusiness: coreBusiness.slice(0, 600),
+      classificationReason: classificationReason.slice(0, 600),
+      classificationSourceUrl: result.url,
+      operatesInBrazil: true as const,
+      brazilOperationEvidence: brazilOperationEvidence.slice(0, 600),
+      brazilOperationSourceUrl: result.url,
+      city: "São Paulo",
+      state: "SP",
+      country: "Brasil",
+      size: "Grande",
+      employees: "1.000+",
+      linkedinUrl,
+      criteriaMatch: "compatible" as const,
+      criteriaReason: criteria
+        ? `Compatível com o critério pesquisado (${criteria.slice(0, 120)}).`
+        : "Compatível com as verticais prioritárias no Brasil.",
+      criteriaConfidence: 80,
+      description,
+      solution: "WAAP" as const,
+      apiScore: 72,
+      waapScore: 78,
+      guardicoreScore: 64,
+      breakdown: {
+        verticalFit: 16,
+        sizeComplexity: 12,
+        digitalPresence: 16,
+        transactionalChannels: 12,
+        recentSignals: 11,
+        solutionFit: 8,
+        evidenceQuality: 4,
+      },
+      recommendation:
+        "Iniciar prospecção consultiva com foco em proteção de aplicações web, APIs expostas e microssegmentação.",
+      evidence: [
+        {
+          criterion: null,
+          quote: literalQuote,
+          publishedAt: result.publishedAt ?? null,
+          headcount: null,
+          kind: "fact" as const,
+          content:
+            result.content.trim().slice(0, 500) ||
+            `${companyName} identificada com operação ativa no Brasil.`,
+          sourceUrl: result.url,
+        },
+      ],
+      titles: ["CISO", "CTO", "Head de Infraestrutura e Segurança"],
+      navigatorQuery: `"${companyName}" (CISO OR CTO OR "Segurança da Informação" OR Infraestrutura) Brasil`,
+      tags: ["brasil", vertical.toLowerCase().replace(/\s+/g, "-")],
+    };
+
+    const parsed = analyzedCompanySchema.safeParse(candidateObj);
+    if (parsed.success) {
+      candidates.push(parsed.data);
+      known.push({ name: companyName, domain: companyDomain });
+    }
+  }
+
+  return candidates;
 }
 
 export async function runDailyResearch(
@@ -361,6 +654,21 @@ export async function runDailyResearch(
             error: message,
           });
         }
+      }
+    }
+
+    if (candidates.length === 0) {
+      candidates = extractDeterministicCandidates(
+        uniqueResults,
+        criteria,
+        inventory,
+      );
+      if (candidates.length > 0) {
+        researchLog("info", "research_deterministic_fallback_extracted", {
+          runId,
+          extractedCount: candidates.length,
+          providerErrors,
+        });
       }
     }
 

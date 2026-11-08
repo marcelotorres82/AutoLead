@@ -3,7 +3,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url().optional(),
   EXA_API_KEY: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
-  GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
+  GEMINI_MODEL: z.string().default("gemini-3.5-flash-lite"),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_MODEL: z.string().default("claude-3-5-sonnet-20241022"),
   PERPLEXITY_API_KEY: z.string().min(1).optional(),

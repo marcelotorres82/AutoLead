@@ -383,8 +383,9 @@ export function geminiResponseJsonSchema() {
 const retiredGeminiModels = new Set([
   "gemini-2.0-flash",
   "gemini-2.0-flash-lite",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
   "gemini-3.1-flash-lite",
-  "gemini-3.5-flash-lite",
   "gemini-1.5-flash",
   "gemini-1.5-pro",
 ]);
@@ -392,9 +393,9 @@ const retiredGeminiModels = new Set([
 function candidateModels() {
   const rawConfigured = llmModelFor("gemini", env.GEMINI_MODEL);
   const configured = retiredGeminiModels.has(rawConfigured)
-    ? "gemini-2.5-flash"
+    ? "gemini-3.5-flash-lite"
     : rawConfigured;
-  const fallbacks = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+  const fallbacks = ["gemini-3.5-flash-lite", "gemini-3.5-flash"];
   return Array.from(new Set([configured, ...fallbacks].filter(Boolean)));
 }
 
@@ -464,90 +465,86 @@ export class GeminiAiProvider implements AiProvider {
     inventory: Array<{ name: string; domain: string }> = [],
   ) {
     const models = candidateModels();
-    const attempts: Array<{ model: string; useSchema: boolean }> = [
-      ...models.map((model) => ({ model, useSchema: true })),
-      ...models.map((model) => ({ model, useSchema: false })),
-    ];
     const attemptErrors: string[] = [];
-    let lastError: Error | undefined;
 
-    for (const { model, useSchema } of attempts) {
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-        const generationConfig: Record<string, unknown> = {
-          responseMimeType: "application/json",
-          temperature: 0.2,
-          maxOutputTokens: 6_000,
-        };
-        if (useSchema) {
-          generationConfig.responseJsonSchema = geminiResponseJsonSchema();
-          if (supportsZeroThinkingBudget(model)) {
-            generationConfig.thinkingConfig = { thinkingBudget: 0 };
+    for (const model of models) {
+      for (const useSchema of [true, false]) {
+        try {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+          const generationConfig: Record<string, unknown> = {
+            responseMimeType: "application/json",
+            temperature: 0.2,
+            maxOutputTokens: 6_000,
+          };
+          if (useSchema) {
+            generationConfig.responseJsonSchema = geminiResponseJsonSchema();
+            if (supportsZeroThinkingBudget(model)) {
+              generationConfig.thinkingConfig = { thinkingBudget: 0 };
+            }
           }
-        }
-        const schemaHint = useSchema
-          ? ""
-          : `\nRetorne exclusivamente um objeto JSON no formato {"companies":[{"name":"...","tradeName":"...","domain":"...","vertical":"Business Services","subsegment":"Logística","coreBusiness":"...","classificationReason":"...","classificationSourceUrl":"https://...","operatesInBrazil":true,"brazilOperationEvidence":"...","brazilOperationSourceUrl":"https://...","city":"São Paulo","state":"SP","country":"Brasil","size":"Grande","employees":"1000+","linkedinUrl":"","criteriaMatch":"compatible","criteriaReason":"...","criteriaConfidence":80,"description":"...","solution":"WAAP","apiScore":70,"waapScore":75,"guardicoreScore":60,"breakdown":{"verticalFit":16,"sizeComplexity":12,"digitalPresence":16,"transactionalChannels":12,"recentSignals":10,"solutionFit":8,"evidenceQuality":4},"recommendation":"...","evidence":[{"kind":"fact","content":"...","sourceUrl":"https://..."}],"titles":["CTO","CISO"],"navigatorQuery":"...","tags":["brasil"]}]}.`;
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": apiKey,
-          },
-          body: JSON.stringify({
-            systemInstruction: {
-              parts: [{ text: researchSystemInstruction() }],
+          const schemaHint = useSchema
+            ? ""
+            : `\nRetorne exclusivamente um objeto JSON no formato {"companies":[{"name":"...","tradeName":"...","domain":"...","vertical":"Business Services","subsegment":"Logística","coreBusiness":"...","classificationReason":"...","classificationSourceUrl":"https://...","operatesInBrazil":true,"brazilOperationEvidence":"...","brazilOperationSourceUrl":"https://...","city":"São Paulo","state":"SP","country":"Brasil","size":"Grande","employees":"1000+","linkedinUrl":"","criteriaMatch":"compatible","criteriaReason":"...","criteriaConfidence":80,"description":"...","solution":"WAAP","apiScore":70,"waapScore":75,"guardicoreScore":60,"breakdown":{"verticalFit":16,"sizeComplexity":12,"digitalPresence":16,"transactionalChannels":12,"recentSignals":10,"solutionFit":8,"evidenceQuality":4},"recommendation":"...","evidence":[{"kind":"fact","content":"...","sourceUrl":"https://..."}],"titles":["CTO","CISO"],"navigatorQuery":"...","tags":["brasil"]}]}.`;
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
             },
-            contents: [
-              {
-                role: "user",
-                parts: [
-                  {
-                    text: `Selecione até 6 empresas inéditas e priorizáveis.${criteriaInstruction(criteria)}${schemaHint} Não inclua nenhuma conta deste inventário: ${JSON.stringify(inventory)}. Analise estas fontes públicas:\n${JSON.stringify(results)}`,
-                  },
-                ],
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{ text: researchSystemInstruction() }],
               },
-            ],
-            generationConfig,
-          }),
-          signal: AbortSignal.timeout(22_000),
-        });
-        const raw = await response.text();
-        if (!response.ok) {
-          let detail = "erro não detalhado";
-          try {
-            const message = z
-              .object({ error: z.object({ message: z.string() }) })
-              .safeParse(JSON.parse(raw || "{}"));
-            if (message.success) detail = message.data.error.message;
-          } catch {
-            // The provider can return a non-JSON proxy error.
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    {
+                      text: `Selecione até 6 empresas inéditas e priorizáveis.${criteriaInstruction(criteria)}${schemaHint} Não inclua nenhuma conta deste inventário: ${JSON.stringify(inventory)}. Analise estas fontes públicas:\n${JSON.stringify(results)}`,
+                    },
+                  ],
+                },
+              ],
+              generationConfig,
+            }),
+            signal: AbortSignal.timeout(22_000),
+          });
+          const raw = await response.text();
+          if (!response.ok) {
+            let detail = "erro não detalhado";
+            try {
+              const message = z
+                .object({ error: z.object({ message: z.string() }) })
+                .safeParse(JSON.parse(raw || "{}"));
+              if (message.success) detail = message.data.error.message;
+            } catch {
+              // The provider can return a non-JSON proxy error.
+            }
+            const err = new Error(
+              `Gemini (${model}${useSchema ? "" : ":json"}) retornou ${response.status}: ${detail}`,
+            );
+            attemptErrors.push(err.message);
+            if (response.status === 404) {
+              break;
+            }
+            continue;
           }
-          const err = new Error(
-            `Gemini (${model}) retornou ${response.status}: ${detail}`,
-          );
-          attemptErrors.push(err.message);
-          lastError = err;
-          continue;
+          const parsedResponse = responseSchema.parse(JSON.parse(raw));
+          const text = parsedResponse.candidates[0].content.parts
+            .map((part) => part.text)
+            .join("");
+          return aiBatchAnalysisSchema.parse(
+            normalizeGeneratedScores(JSON.parse(text), results),
+          ).companies;
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          attemptErrors.push(`${model}${useSchema ? "" : ":json"}: ${msg}`);
         }
-        const parsedResponse = responseSchema.parse(JSON.parse(raw));
-        const text = parsedResponse.candidates[0].content.parts
-          .map((part) => part.text)
-          .join("");
-        return aiBatchAnalysisSchema.parse(
-          normalizeGeneratedScores(JSON.parse(text), results),
-        ).companies;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        attemptErrors.push(`${model}: ${lastError.message}`);
       }
     }
 
-    throw (
-      lastError ??
-      new Error(
-        `Falha ao consultar modelos Gemini: ${attemptErrors.join(" | ")}`,
-      )
+    throw new Error(
+      attemptErrors.join(" | ") || "Falha ao consultar modelos Gemini",
     );
   }
 
