@@ -403,9 +403,54 @@ export async function persistAnalyzedCompanies(
       .map((name) => ({ name, domain: item.domain })),
   );
   const verticalMap = new Map(verticalRows.map((row) => [row.name, row.id]));
-  const resultByUrl = new Map(
-    searchResults.map((result) => [result.url, result]),
-  );
+  const canonicalizeUrl = (rawUrl: string) => {
+    try {
+      const parsed = new URL(rawUrl.trim());
+      parsed.hash = "";
+      parsed.search = "";
+      parsed.pathname = parsed.pathname.replace(/\/$/, "") || "/";
+      return parsed.toString().toLowerCase();
+    } catch {
+      return rawUrl.trim().replace(/\/$/, "").toLowerCase();
+    }
+  };
+  const resultByUrl = new Map<string, SearchResult>();
+  const resultByCanonicalUrl = new Map<string, SearchResult>();
+  const resultByDomain = new Map<string, SearchResult>();
+  for (const result of searchResults) {
+    resultByUrl.set(result.url, result);
+    resultByCanonicalUrl.set(canonicalizeUrl(result.url), result);
+    const resultDomain = normalizeDomain(result.url);
+    if (resultDomain && !resultByDomain.has(resultDomain)) {
+      resultByDomain.set(resultDomain, result);
+    }
+  }
+  const resolveSourceResult = (
+    rawUrl: string | undefined,
+    candidateDomain: string,
+    candidateName: string,
+  ): SearchResult | undefined => {
+    if (rawUrl) {
+      const exact = resultByUrl.get(rawUrl);
+      if (exact) return exact;
+      const canonical = resultByCanonicalUrl.get(canonicalizeUrl(rawUrl));
+      if (canonical) return canonical;
+      const urlDomain = normalizeDomain(rawUrl);
+      if (urlDomain && resultByDomain.has(urlDomain)) {
+        return resultByDomain.get(urlDomain);
+      }
+    }
+    if (candidateDomain && resultByDomain.has(candidateDomain)) {
+      return resultByDomain.get(candidateDomain);
+    }
+    const normCandidate = normalizeName(candidateName);
+    if (normCandidate.length >= 3) {
+      return searchResults.find((item) =>
+        normalizeName(`${item.title} ${item.content}`).includes(normCandidate),
+      );
+    }
+    return undefined;
+  };
   let created = 0;
   let duplicateCount = 0;
   const employeeLimit = extractEmployeeLimit(criteria);
@@ -454,26 +499,52 @@ export async function persistAnalyzedCompanies(
       duplicateCount += 1;
       continue;
     }
-    const validEvidence = candidate.evidence.filter((item) =>
-      resultByUrl.has(item.sourceUrl),
-    );
-    const brazilOperationSource = resultByUrl.get(
-      candidate.brazilOperationSourceUrl,
-    );
-    const hasBrazilFact = candidate.evidence.some(
-      (item) =>
-        item.kind === "fact" &&
-        item.sourceUrl === candidate.brazilOperationSourceUrl,
-    );
+    const resolvedEvidence = candidate.evidence
+      .map((item) => {
+        const matched = resolveSourceResult(
+          item.sourceUrl,
+          domain,
+          candidate.name,
+        );
+        return matched ? { ...item, sourceUrl: matched.url, matched } : null;
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+    const classificationSource =
+      resolveSourceResult(
+        candidate.classificationSourceUrl,
+        domain,
+        candidate.name,
+      ) ?? resolvedEvidence[0]?.matched;
+    const brazilOperationSource =
+      resolveSourceResult(
+        candidate.brazilOperationSourceUrl,
+        domain,
+        candidate.name,
+      ) ??
+      resolvedEvidence.find((item) =>
+        hasBrazilOperationEvidence(candidate, item.matched),
+      )?.matched ??
+      resolvedEvidence[0]?.matched;
     if (
       !domain ||
-      !validEvidence.length ||
-      !resultByUrl.has(candidate.classificationSourceUrl) ||
+      !resolvedEvidence.length ||
+      !classificationSource ||
       !brazilOperationSource ||
-      !hasBrazilFact ||
       !hasBrazilOperationEvidence(candidate, brazilOperationSource)
     )
       continue;
+    const validEvidence = resolvedEvidence.map((item) => ({
+      criterion: item.criterion,
+      quote: item.quote,
+      publishedAt: item.publishedAt,
+      headcount: item.headcount,
+      kind: item.kind,
+      content: item.content,
+      sourceUrl: item.sourceUrl,
+    }));
+    for (const item of resolvedEvidence) {
+      resultByUrl.set(item.sourceUrl, item.matched);
+    }
     const breakdown = scoreBreakdownSchema.parse(candidate.breakdown);
     const metadata: AnalysisMetadata = {
       qualification,
@@ -492,7 +563,7 @@ export async function persistAnalyzedCompanies(
       criteriaConfidence: candidate.criteriaConfidence,
       coreBusiness: candidate.coreBusiness,
       classificationReason: candidate.classificationReason,
-      classificationSourceUrl: candidate.classificationSourceUrl,
+      classificationSourceUrl: classificationSource.url,
     };
     const linkedinUrl = verifiedLinkedInCompanyUrl(
       candidate.linkedinUrl,

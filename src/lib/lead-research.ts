@@ -11,7 +11,7 @@ import {
   persistResearchedLeads,
 } from "@/lib/lead-repository";
 import { GeminiAiProvider } from "@/lib/providers/gemini";
-import { ExaSearchProvider } from "@/lib/providers/exa";
+import { MultiSearchProvider } from "@/lib/providers/multi-search";
 import type { AiProvider, SearchResult } from "@/lib/providers/types";
 import { mergeSearchResults } from "@/lib/research";
 import { updateResearchRunMetadata } from "@/lib/research-run-repository";
@@ -62,7 +62,7 @@ export async function runLeadResearch(runId: string, companyId: string) {
     });
 
     const queries = buildLeadSearchQueries(context);
-    const searchProvider = new ExaSearchProvider();
+    const searchProvider = new MultiSearchProvider();
     const searches = await Promise.allSettled(
       queries.map((query) => searchProvider.search(query, 12)),
     );

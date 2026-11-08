@@ -167,4 +167,98 @@ describe("Gemini", () => {
     expect(fetchMock.mock.calls[0][0]).toContain("gemini-2.5-flash:");
     expect(fetchMock.mock.calls[1][0]).toContain("gemini-2.5-flash-lite:");
   });
+
+  it("normaliza quote curta e headcount zero sem derrubar o lote nem chamar gemini-2.0-flash-lite", async () => {
+    env.GEMINI_API_KEY = "test-key";
+    const companyWithLooseFields = {
+      name: "Varejo Brasil Digital",
+      tradeName: "",
+      domain: "varejobrasil.com.br",
+      vertical: "Retail",
+      subsegment: "Varejo e e-commerce",
+      coreBusiness:
+        "Operação de e-commerce omnichannel e varejo digital no mercado brasileiro.",
+      classificationReason:
+        "A empresa opera plataforma própria de comércio eletrônico no Brasil.",
+      classificationSourceUrl: "https://varejobrasil.com.br/sobre",
+      operatesInBrazil: true as const,
+      brazilOperationEvidence:
+        "Sede e centros de distribuição em São Paulo, atendendo todo o Brasil.",
+      brazilOperationSourceUrl: "https://varejobrasil.com.br/sobre",
+      city: "São Paulo",
+      state: "SP",
+      country: "Brasil",
+      size: "Média",
+      employees: "200-500",
+      linkedinUrl: "",
+      criteriaMatch: "compatible" as const,
+      criteriaReason: "Porte e vertical compatíveis.",
+      criteriaConfidence: 80,
+      description:
+        "Varejista digital brasileira com plataforma de e-commerce própria.",
+      solution: "WAAP" as const,
+      apiScore: 75,
+      waapScore: 82,
+      guardicoreScore: 55,
+      breakdown: {
+        verticalFit: 18,
+        sizeComplexity: 12,
+        digitalPresence: 18,
+        transactionalChannels: 14,
+        recentSignals: 10,
+        solutionFit: 8,
+        evidenceQuality: 4,
+      },
+      recommendation:
+        "Abordar liderança de tecnologia e segurança sobre proteção de APIs e WAAP.",
+      evidence: [
+        {
+          criterion: "technology",
+          quote: "curto",
+          publishedAt: "",
+          headcount: 0,
+          kind: "fact" as const,
+          content: "Plataforma de e-commerce ativa no Brasil.",
+          sourceUrl: "https://varejobrasil.com.br/sobre",
+        },
+      ],
+      titles: ["CTO"],
+      navigatorQuery: "Varejo Brasil Digital CTO",
+      tags: ["ecommerce"],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      companies: [companyWithLooseFields],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const analyzed = await new GeminiAiProvider().analyzeBatch([
+      {
+        title: "Sobre Varejo Brasil",
+        url: "https://varejobrasil.com.br/sobre",
+        content: "Conteúdo institucional no Brasil",
+      },
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(analyzed).toHaveLength(1);
+    expect(analyzed[0].evidence[0].quote).toBeNull();
+    expect(analyzed[0].evidence[0].headcount).toBeNull();
+  });
 });

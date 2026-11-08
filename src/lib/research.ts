@@ -14,7 +14,7 @@ import { verticalNames, verticalTaxonomy } from "@/lib/domain";
 import { env } from "@/lib/env";
 import { sanitizeSearchResult } from "@/lib/external-content";
 import { GeminiAiProvider } from "@/lib/providers/gemini";
-import { ExaSearchProvider } from "@/lib/providers/exa";
+import { MultiSearchProvider } from "@/lib/providers/multi-search";
 import type { SearchResult } from "@/lib/providers/types";
 import { searchWithCache } from "@/lib/research-cache";
 import { updateResearchRunMetadata } from "@/lib/research-run-repository";
@@ -43,7 +43,7 @@ export function buildSearchQueries(
     return [
       `${requested} empresas com operação no Brasil número de funcionários integrantes`,
       `${requested} investimento cloud inteligência artificial transformação digital site oficial`,
-      `${requested} estratégia roadmap tecnologia IA 2027`,
+      `${requested} empresas brasileiras site:.com.br plataforma digital e-commerce APIs`,
       `${requested} Brasil site:linkedin.com/company`,
       `${requested} Brasil vagas expansão fusão novos contratos ${year}`,
     ];
@@ -64,7 +64,7 @@ export function buildSearchQueries(
       '-banco -fintech -pagamento -adquirente -maquininha -telecom -operadora -ISP -"consultoria de TI" -"serviços gerenciados de TI" -"empresa de tecnologia" -"software house"';
 
     tiers[5].push(
-      `${baseVertical} estratégia tecnologia inteligência artificial roadmap 2027 ${negFilter}`,
+      `${baseVertical} site:.com.br plataforma digital e-commerce portal clientes ${negFilter}`,
     );
     // Tier 1: Crescimento recente
     tiers[0].push(
@@ -194,13 +194,14 @@ export async function runDailyResearch(
       throw new Error("DATABASE_URL ausente; pesquisa real não executada");
     const db = getDb();
     const aiProviders = configuredAiProviders();
-    if (!env.EXA_API_KEY || !aiProviders.length)
+    if (!aiProviders.length)
       throw new Error("Integrações de pesquisa incompletas");
+    const searchProvider = new MultiSearchProvider();
     const selectedAi = aiProviders[0] || {
       provider: { name: "gemini" },
       model: "gemini-2.5-flash",
     };
-    const providerName = `exa+${selectedAi.provider.name}`;
+    const providerName = `${searchProvider.name}+${selectedAi.provider.name}`;
 
     const [existing] = activeRunId
       ? await db
@@ -258,7 +259,7 @@ export async function runDailyResearch(
     const searchStage = await startResearchStage({
       researchRunId: runId,
       stage: "DISCOVERY_SEARCH",
-      provider: "exa",
+      provider: searchProvider.name,
       payload: { criteria, forceRefresh },
     });
     activeStageId = searchStage.id;
@@ -276,16 +277,13 @@ export async function runDailyResearch(
       0,
       16,
     );
-    if (!env.EXA_API_KEY)
-      throw new Error("Integrações de pesquisa incompletas");
-    const searchProvider = new ExaSearchProvider();
     const searches: PromiseSettledResult<SearchResult[]>[] = [];
     for (let offset = 0; offset < queries.length; offset += 4) {
       const batch = queries.slice(offset, offset + 4);
       searches.push(
         ...(await Promise.allSettled(
           batch.map((query) =>
-            searchWithCache(searchProvider, query, 12, forceRefresh),
+            searchWithCache(searchProvider, query, 14, forceRefresh),
           ),
         )),
       );
@@ -304,7 +302,7 @@ export async function runDailyResearch(
         .map((item) => item.value),
     ).map(sanitizeSearchResult);
     if (!uniqueResults.length)
-      throw new Error("Exa não retornou fontes públicas");
+      throw new Error("Os provedores de busca não retornaram fontes públicas");
     await completeResearchStage(searchStage.id, {
       outputReference: `sources:${uniqueResults.length}`,
       metadata: {

@@ -316,7 +316,7 @@ export function isBrazilCountry(value: string): boolean {
 }
 
 const brazilOperationMarkerRegex =
-  /(?:\bbrasil\b|\bbrazil\b|brasileir[ao]s?|\bcnpj\b|\+55\b|acre|alagoas|amap[aá]|amazonas|bahia|cear[aá]|distrito federal|esp[ií]rito santo|goi[aá]s|maranh[aã]o|mato grosso|minas gerais|par[aá]|para[ií]ba|paran[aá]|pernambuco|piau[ií]|rio grande do (?:norte|sul)|rond[oô]nia|roraima|santa catarina|s[aã]o paulo|sergipe|tocantins|rio de janeiro|bras[ií]lia|belo horizonte|porto alegre|curitiba|recife|salvador|fortaleza|florian[oó]polis|goi[aâ]nia|manaus|bel[eé]m)/i;
+  /(?:\bbrasil\b|\bbrazil\b|brasileir[ao]s?|\.com\.br\b|\.br\/|\bcnpj\b|\+55\b|acre|alagoas|amap[aá]|amazonas|bahia|cear[aá]|distrito federal|esp[ií]rito santo|goi[aá]s|maranh[aã]o|mato grosso|minas gerais|par[aá]|para[ií]ba|paran[aá]|pernambuco|piau[ií]|rio grande do (?:norte|sul)|rond[oô]nia|roraima|santa catarina|s[aã]o paulo|sergipe|tocantins|rio de janeiro|bras[ií]lia|belo horizonte|porto alegre|curitiba|recife|salvador|fortaleza|florian[oó]polis|goi[aâ]nia|manaus|bel[eé]m|campinas|joinville|blumenau|uberl[aâ]ndia|ribeir[aã]o preto|sorocaba|barueri|alphaville|osasco|santo andr[eé]|s[aã]o bernardo)/i;
 
 export function hasBrazilOperationEvidence(
   candidate: {
@@ -335,7 +335,7 @@ export function hasBrazilOperationEvidence(
 
   if (!source) return false;
   return brazilOperationMarkerRegex.test(
-    [source.title, source.content].filter(Boolean).join(" "),
+    [source.title, source.content, source.url].filter(Boolean).join(" "),
   );
 }
 
