@@ -91,19 +91,53 @@ export async function requireSession() {
   return session;
 }
 
+const BCRYPT_HASH_REGEX = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
+
+function normalizeBcryptCandidates(rawHash?: string): string[] {
+  if (!rawHash) return [];
+  const trimmed = rawHash
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/\\\$/g, "$");
+  const candidates = new Set<string>();
+  if (BCRYPT_HASH_REGEX.test(trimmed)) {
+    candidates.add(trimmed);
+  }
+  try {
+    const decoded = Buffer.from(trimmed, "base64")
+      .toString("utf8")
+      .trim()
+      .replace(/\\\$/g, "$");
+    if (BCRYPT_HASH_REGEX.test(decoded)) {
+      candidates.add(decoded);
+    }
+  } catch {
+    // Ignorar falha de decode base64
+  }
+  const stripped = trimmed.replace(/^\$+/, "");
+  if (/^[./A-Za-z0-9]{53}$/.test(stripped)) {
+    for (const prefix of ["$2b$12$", "$2b$10$", "$2a$12$", "$2a$10$"]) {
+      candidates.add(`${prefix}${stripped}`);
+    }
+  }
+  return Array.from(candidates);
+}
+
 export async function verifyCredentials(email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
   const rawHash = env.ADMIN_PASSWORD_HASH?.trim().replace(/^["']|["']$/g, "");
   const rawPassword = env.ADMIN_PASSWORD?.trim();
-  const hasConfiguredPassword = Boolean(rawHash || rawPassword);
+  const bcryptCandidates = normalizeBcryptCandidates(rawHash);
+  const hasValidPasswordConfig = Boolean(
+    rawPassword || bcryptCandidates.length > 0,
+  );
 
   const isDemoLogin =
-    (process.env.NODE_ENV !== "production" || !hasConfiguredPassword) &&
+    (process.env.NODE_ENV !== "production" || !hasValidPasswordConfig) &&
     normalizedEmail === "demo@prospectradar.local" &&
     password === "demo1234";
 
   if (isDemoLogin) return true;
-  if (!hasConfiguredPassword) return false;
 
   const allowedAdminEmails = [
     env.ADMIN_EMAIL?.trim().toLowerCase(),
@@ -116,24 +150,17 @@ export async function verifyCredentials(email: string, password: string) {
     return true;
   }
 
-  if (!rawHash) return false;
-
-  if (rawHash.startsWith("$2")) {
+  for (const candidateHash of bcryptCandidates) {
     try {
-      if (await compare(password, rawHash)) return true;
+      if (await compare(password, candidateHash)) return true;
     } catch {
-      // Continuar para fallback caso o hash esteja malformado
+      // Testar próximo formato candidato
     }
   }
 
-  try {
-    const decoded = Buffer.from(rawHash, "base64").toString("utf8").trim();
-    if (decoded.startsWith("$2") && (await compare(password, decoded))) {
-      return true;
-    }
-  } catch {
-    // Ignorar falha de decode base64
+  if (rawHash && !rawHash.startsWith("$") && password === rawHash) {
+    return true;
   }
 
-  return password === rawHash;
+  return false;
 }
