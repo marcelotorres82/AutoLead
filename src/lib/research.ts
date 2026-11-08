@@ -4,6 +4,12 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { researchRuns, verticals } from "@/db/schema";
 import {
+  buildB2BTargetedQueries,
+  extractCnpjsFromText,
+  fetchBrasilApiCnpj,
+  parseDirectoryOrLinkedInSource,
+} from "@/lib/brazil-b2b-enrichment";
+import {
   listCompanyInventory,
   listCompanies,
   persistAnalyzedCompanies,
@@ -293,28 +299,19 @@ export function extractDeterministicCandidates(
     let companyName = "";
     let companyDomain = "";
     let linkedinUrl = "";
+    let detectedEmployees = "1.000+";
+    let detectedCity = "São Paulo";
+    let detectedState = "SP";
 
-    const isLinkedInCompany =
-      (rawDomain === "linkedin.com" || rawDomain.endsWith(".linkedin.com")) &&
-      /\/company\/([^/?#]+)/i.test(result.url);
+    const dirOrLinkedIn = parseDirectoryOrLinkedInSource(result);
 
-    if (isLinkedInCompany) {
-      const slugMatch = result.url.match(/\/company\/([^/?#]+)/i);
-      const slug = slugMatch?.[1] ?? "";
-      if (!slug || slug.length < 3) continue;
-      const cleanTitle = result.title
-        .replace(/\s*[|\-–—]\s*LinkedIn.*$/i, "")
-        .replace(/^LinkedIn\s*[|\-–—]\s*/i, "")
-        .trim();
-      companyName =
-        cleanTitle.length >= 2 && cleanTitle.length <= 80
-          ? cleanTitle
-          : slug
-              .replace(/[-_]+/g, " ")
-              .replace(/\b\w/g, (char) => char.toUpperCase());
-      const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "");
-      companyDomain = `${cleanSlug}.com.br`;
-      linkedinUrl = result.url.startsWith("https://") ? result.url : "";
+    if (dirOrLinkedIn) {
+      companyName = dirOrLinkedIn.companyName;
+      companyDomain = dirOrLinkedIn.inferredDomain;
+      linkedinUrl = dirOrLinkedIn.linkedinUrl;
+      detectedEmployees = dirOrLinkedIn.employees;
+      detectedCity = dirOrLinkedIn.city;
+      detectedState = dirOrLinkedIn.state;
     } else {
       const isIgnored = Array.from(ignoredDiscoveryDomains).some(
         (ignored) =>
@@ -401,11 +398,11 @@ export function extractDeterministicCandidates(
       operatesInBrazil: true as const,
       brazilOperationEvidence: brazilOperationEvidence.slice(0, 600),
       brazilOperationSourceUrl: result.url,
-      city: "São Paulo",
-      state: "SP",
+      city: detectedCity,
+      state: detectedState,
       country: "Brasil",
       size: "Grande",
-      employees: "1.000+",
+      employees: detectedEmployees,
       linkedinUrl,
       criteriaMatch: "compatible" as const,
       criteriaReason: criteria
@@ -566,10 +563,12 @@ export async function runDailyResearch(
 
     const activeVerticalNames = activeVerticalRows.map((item) => item.name);
 
-    const queries = buildSearchQueries(criteria, activeVerticalNames).slice(
-      0,
-      16,
-    );
+    const queries = Array.from(
+      new Set([
+        ...buildB2BTargetedQueries(criteria),
+        ...buildSearchQueries(criteria, activeVerticalNames),
+      ]),
+    ).slice(0, 16);
     const searches: PromiseSettledResult<SearchResult[]>[] = [];
     for (let offset = 0; offset < queries.length; offset += 4) {
       const batch = queries.slice(offset, offset + 4);
@@ -594,6 +593,34 @@ export async function runDailyResearch(
         )
         .map((item) => item.value),
     ).map(sanitizeSearchResult);
+
+    // Enriquecimento oficial de CNPJ via BrasilAPI (Receita Federal) quando houver CNPJ nas fontes ou no critério
+    const detectedCnpjs = Array.from(
+      new Set(
+        extractCnpjsFromText(
+          `${criteria ?? ""} ${uniqueResults
+            .slice(0, 15)
+            .map((r) => `${r.url} ${r.title} ${r.content}`)
+            .join(" ")}`,
+        ),
+      ),
+    ).slice(0, 3);
+    if (detectedCnpjs.length > 0) {
+      const cnpjRecords = await Promise.all(
+        detectedCnpjs.map((cnpj) => fetchBrasilApiCnpj(cnpj)),
+      );
+      for (const record of cnpjRecords) {
+        if (record && /ativa/i.test(record.situacaoCadastral)) {
+          uniqueResults.unshift({
+            title: `${record.nomeFantasia} (${record.razaoSocial}) - CNPJ ${record.cnpj} | Econodata`,
+            url: `https://www.econodata.com.br/consulta-empresa/${record.cnpj}`,
+            content: `Empresa brasileira ativa registrada na Receita Federal sob CNPJ ${record.cnpj}. Razão Social: ${record.razaoSocial}. Nome Fantasia: ${record.nomeFantasia}. Atividade principal (CNAE): ${record.cnaeFiscalDescricao}. Porte: ${record.porte}. Sede: ${record.municipio}, ${record.uf}, Brasil. Sócios/Administradores: ${record.qsa.join(", ") || "Não informado"}.`,
+            provider: "brasilapi-cnpj",
+          });
+        }
+      }
+    }
+
     if (!uniqueResults.length)
       throw new Error("Os provedores de busca não retornaram fontes públicas");
     await completeResearchStage(searchStage.id, {

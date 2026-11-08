@@ -7,6 +7,29 @@ import { useDemoStore } from "@/components/demo-store";
 import { PageHeading } from "@/components/page-heading";
 import { ResearchRunList } from "@/components/research-run-list";
 import { Button } from "@/components/ui/button";
+const searchPresets = [
+  {
+    label: "LinkedIn Empresas (1.000+)",
+    query:
+      "Empresas de business services e logística no Brasil com mais de 1.000 funcionários site:linkedin.com/company",
+  },
+  {
+    label: "Econodata / Bases CNPJ",
+    query:
+      "Grandes empresas de logística, advocacia e serviços corporativos em São Paulo site:econodata.com.br",
+  },
+  {
+    label: "Varejo & E-commerce",
+    query:
+      "Empresas de varejo e e-commerce com operação no Brasil e mais de 500 funcionários",
+  },
+  {
+    label: "Educação & Universidades",
+    query:
+      "Universidades e grupos educacionais no Brasil com mais de 1.000 funcionários",
+  },
+];
+
 export default function ResearchPage() {
   const { generate, demoMode } = useDemoStore();
   const [isResearching, setIsResearching] = useState(false);
@@ -58,12 +81,26 @@ export default function ResearchPage() {
         }}
       >
         <label htmlFor="ai-company-search" className="text-sm font-semibold">
-          Pesquisar novas empresas com IA
+          Pesquisar novas empresas com IA + LinkedIn &amp; Diretórios B2B
         </label>
         <p id="ai-company-search-help" className="mt-1 text-sm text-slate-500">
-          Descreva setor, região, porte ou outros critérios em linguagem
-          natural.
+          Descreva setor, região e porte, ou cole diretamente uma URL do
+          LinkedIn (<code>linkedin.com/company/...</code>) ou CNPJ (
+          <code>XX.XXX.XXX/XXXX-XX</code>) para consulta na Receita Federal
+          (BrasilAPI), LinkedIn, Econodata e CNPJ.biz.
         </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {searchPresets.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={() => setQuery(preset.query)}
+              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-cyan-500 hover:bg-cyan-50 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-cyan-400"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
         <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end">
           <textarea
             id="ai-company-search"
