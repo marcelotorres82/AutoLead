@@ -25,6 +25,7 @@ import {
   verticals,
 } from "@/db/schema";
 import {
+  calculateScore,
   dateInSaoPaulo,
   extractEmployeeLimit,
   extractEmployeeUpperBound,
@@ -615,7 +616,10 @@ export async function persistAnalyzedCompanies(
         linkedinUrl: linkedinUrl ?? null,
         description: candidate.description,
         suggestedSolution: recommendedSolution,
-        score: qualification.score,
+        score:
+          qualification.score > 0
+            ? qualification.score
+            : calculateScore(breakdown),
         recommendation: candidate.recommendation,
         status: "Nova",
         qualificationStatus:

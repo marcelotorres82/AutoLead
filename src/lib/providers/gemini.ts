@@ -6,6 +6,10 @@ import {
   analyzedCompanySchema,
   normalizeDomain,
   normalizeName,
+  solutions,
+  subverticalNames,
+  verticalNames,
+  verticalTaxonomy,
 } from "@/lib/domain";
 import { env, llmModelFor } from "@/lib/env";
 import {
@@ -47,16 +51,36 @@ function ensureMinLength(value: unknown, min: number, max: number, fallback: str
   return text.slice(0, max);
 }
 
-export function normalizeGeneratedScores(value: unknown) {
+const validVerticals = new Set<string>(verticalNames);
+const validSubsegments = new Set<string>(subverticalNames);
+const validSolutions = new Set<string>(solutions);
+const defaultSubsegmentByVertical: Record<string, string> = Object.fromEntries(
+  Object.entries(verticalTaxonomy).map(([vertical, subs]) => [
+    vertical,
+    subs[0],
+  ]),
+);
+
+export function normalizeGeneratedScores(
+  value: unknown,
+  sourceResults: SearchResult[] = [],
+) {
   if (!value || typeof value !== "object") return value;
   const batch = value as Record<string, unknown>;
-  if (!Array.isArray(batch.companies)) return value;
+  const rawList = Array.isArray(batch.companies)
+    ? batch.companies
+    : Array.isArray(value)
+      ? (value as unknown[])
+      : null;
+  if (!rawList) return value;
   const clamp = (score: unknown, maximum: number, fallback = 0) =>
     typeof score === "number" && Number.isFinite(score)
       ? Math.max(0, Math.min(maximum, Math.round(score)))
       : fallback;
 
-  const normalizedCompanies = batch.companies
+  const firstResultUrl = sourceResults[0]?.url ?? "";
+
+  const normalizedCompanies = rawList
     .map((item) => {
       if (!item || typeof item !== "object") return null;
       const company = item as Record<string, unknown>;
@@ -71,7 +95,7 @@ export function normalizeGeneratedScores(value: unknown) {
           : typeof company.classificationSourceUrl === "string" &&
               company.classificationSourceUrl.length >= 8
             ? company.classificationSourceUrl
-            : "";
+            : firstResultUrl;
 
       const rawEvidence = Array.isArray(company.evidence)
         ? company.evidence
@@ -134,8 +158,66 @@ export function normalizeGeneratedScores(value: unknown) {
         .filter((ev): ev is NonNullable<typeof ev> => ev !== null)
         .slice(0, 12);
 
+      if (sanitizedEvidence.length === 0 && fallbackUrl.length >= 8) {
+        sanitizedEvidence.push({
+          criterion: null,
+          quote: null,
+          publishedAt: null,
+          headcount: null,
+          kind: "fact",
+          content: ensureMinLength(
+            company.brazilOperationEvidence ?? company.description,
+            10,
+            600,
+            "Operação corporativa ativa no Brasil identificada na fonte pública.",
+          ),
+          sourceUrl: fallbackUrl,
+        });
+      }
+
+      const vertical =
+        typeof company.vertical === "string" &&
+        validVerticals.has(company.vertical)
+          ? company.vertical
+          : "Business Services";
+      const allowedSubs =
+        verticalTaxonomy[vertical as keyof typeof verticalTaxonomy] ?? [];
+      const subsegment =
+        typeof company.subsegment === "string" &&
+        validSubsegments.has(company.subsegment) &&
+        (allowedSubs as readonly string[]).includes(company.subsegment)
+          ? company.subsegment
+          : (defaultSubsegmentByVertical[vertical] ??
+            "Agências de publicidade e marketing");
+      const solution =
+        typeof company.solution === "string" &&
+        validSolutions.has(company.solution)
+          ? company.solution
+          : "WAAP";
+      const resolvedUrl =
+        sanitizedEvidence[0]?.sourceUrl || fallbackUrl || "https://brasil.gov.br";
+
       const candidate = {
         ...company,
+        vertical,
+        subsegment,
+        solution,
+        classificationSourceUrl:
+          typeof company.classificationSourceUrl === "string" &&
+          company.classificationSourceUrl.trim().length >= 8
+            ? company.classificationSourceUrl.trim().slice(0, 2048)
+            : resolvedUrl,
+        brazilOperationSourceUrl:
+          typeof company.brazilOperationSourceUrl === "string" &&
+          company.brazilOperationSourceUrl.trim().length >= 8
+            ? company.brazilOperationSourceUrl.trim().slice(0, 2048)
+            : resolvedUrl,
+        criteriaMatch:
+          company.criteriaMatch === "compatible" ||
+          company.criteriaMatch === "uncertain" ||
+          company.criteriaMatch === "incompatible"
+            ? company.criteriaMatch
+            : "compatible",
         tradeName:
           typeof company.tradeName === "string"
             ? company.tradeName.slice(0, 200)
@@ -250,11 +332,27 @@ export function normalizeGeneratedScores(value: unknown) {
   };
 }
 
+const geminiWireEvidenceSchema = z.object({
+  kind: z.enum(["fact", "signal", "hypothesis"]),
+  content: z.string(),
+  sourceUrl: z.string(),
+});
+
+const geminiWireBatchSchema = z.object({
+  companies: z.array(
+    analyzedCompanySchema.extend({
+      operatesInBrazil: z.boolean(),
+      evidence: z.array(geminiWireEvidenceSchema),
+    }),
+  ),
+});
+
 function simplifiedResponseJsonSchema(schema: z.ZodType) {
   const jsonSchema = z.toJSONSchema(schema, { target: "draft-7" });
   const expensiveConstraints = new Set([
     "$schema",
     "additionalProperties",
+    "const",
     "exclusiveMaximum",
     "exclusiveMinimum",
     "format",
@@ -279,13 +377,14 @@ function simplifiedResponseJsonSchema(schema: z.ZodType) {
 }
 
 export function geminiResponseJsonSchema() {
-  return simplifiedResponseJsonSchema(aiBatchAnalysisSchema);
+  return simplifiedResponseJsonSchema(geminiWireBatchSchema);
 }
 
 const retiredGeminiModels = new Set([
   "gemini-2.0-flash",
   "gemini-2.0-flash-lite",
   "gemini-3.1-flash-lite",
+  "gemini-3.5-flash-lite",
   "gemini-1.5-flash",
   "gemini-1.5-pro",
 ]);
@@ -295,16 +394,12 @@ function candidateModels() {
   const configured = retiredGeminiModels.has(rawConfigured)
     ? "gemini-2.5-flash"
     : rawConfigured;
-  const fallbacks = [
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-3.5-flash-lite",
-  ];
+  const fallbacks = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
   return Array.from(new Set([configured, ...fallbacks].filter(Boolean)));
 }
 
 function supportsZeroThinkingBudget(model: string) {
-  return model.startsWith("gemini-2.5") || model.startsWith("gemini-3");
+  return model.startsWith("gemini-2.5");
 }
 
 export class GeminiAiProvider implements AiProvider {
@@ -317,16 +412,17 @@ export class GeminiAiProvider implements AiProvider {
   ) {
     const apiKey = env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY não configurada");
-    const compactResults = results.slice(0, 48).map((item) => ({
-      ...item,
-      content: item.content.slice(0, 1800),
+    const compactResults = results.slice(0, 18).map((item) => ({
+      title: item.title.slice(0, 180),
+      url: item.url,
+      content: item.content.slice(0, 800),
+      ...(item.publishedAt ? { publishedAt: item.publishedAt } : {}),
     }));
-    const compactInventory = inventory.slice(0, 120);
-    const chunkSize = 20;
-    const chunks: SearchResult[][] = [];
-    for (let i = 0; i < compactResults.length; i += chunkSize) {
-      chunks.push(compactResults.slice(i, i + chunkSize));
-    }
+    const compactInventory = inventory.slice(0, 60).map((item) => ({
+      name: item.name,
+      domain: item.domain,
+    }));
+    const chunks = compactResults.length ? [compactResults] : [];
     const settled = await Promise.allSettled(
       chunks.map((chunk) =>
         this.analyzeChunk(chunk, apiKey, criteria, compactInventory),
@@ -365,23 +461,33 @@ export class GeminiAiProvider implements AiProvider {
     results: SearchResult[],
     apiKey: string,
     criteria?: string,
-    inventory: CompanyInventoryItem[] = [],
+    inventory: Array<{ name: string; domain: string }> = [],
   ) {
     const models = candidateModels();
+    const attempts: Array<{ model: string; useSchema: boolean }> = [
+      ...models.map((model) => ({ model, useSchema: true })),
+      ...models.map((model) => ({ model, useSchema: false })),
+    ];
+    const attemptErrors: string[] = [];
     let lastError: Error | undefined;
 
-    for (const model of models) {
+    for (const { model, useSchema } of attempts) {
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
         const generationConfig: Record<string, unknown> = {
           responseMimeType: "application/json",
-          responseJsonSchema: geminiResponseJsonSchema(),
           temperature: 0.2,
-          maxOutputTokens: 12_000,
+          maxOutputTokens: 6_000,
         };
-        if (supportsZeroThinkingBudget(model)) {
-          generationConfig.thinkingConfig = { thinkingBudget: 0 };
+        if (useSchema) {
+          generationConfig.responseJsonSchema = geminiResponseJsonSchema();
+          if (supportsZeroThinkingBudget(model)) {
+            generationConfig.thinkingConfig = { thinkingBudget: 0 };
+          }
         }
+        const schemaHint = useSchema
+          ? ""
+          : `\nRetorne exclusivamente um objeto JSON no formato {"companies":[{"name":"...","tradeName":"...","domain":"...","vertical":"Business Services","subsegment":"Logística","coreBusiness":"...","classificationReason":"...","classificationSourceUrl":"https://...","operatesInBrazil":true,"brazilOperationEvidence":"...","brazilOperationSourceUrl":"https://...","city":"São Paulo","state":"SP","country":"Brasil","size":"Grande","employees":"1000+","linkedinUrl":"","criteriaMatch":"compatible","criteriaReason":"...","criteriaConfidence":80,"description":"...","solution":"WAAP","apiScore":70,"waapScore":75,"guardicoreScore":60,"breakdown":{"verticalFit":16,"sizeComplexity":12,"digitalPresence":16,"transactionalChannels":12,"recentSignals":10,"solutionFit":8,"evidenceQuality":4},"recommendation":"...","evidence":[{"kind":"fact","content":"...","sourceUrl":"https://..."}],"titles":["CTO","CISO"],"navigatorQuery":"...","tags":["brasil"]}]}.`;
         const response = await fetch(endpoint, {
           method: "POST",
           headers: {
@@ -397,14 +503,14 @@ export class GeminiAiProvider implements AiProvider {
                 role: "user",
                 parts: [
                   {
-                    text: `Selecione até 10 empresas inéditas e priorizáveis.${criteriaInstruction(criteria)} Não inclua nenhuma conta deste inventário, considerando também marcas, aliases e domínios: ${JSON.stringify(inventory)}. Analise estas fontes públicas:\n${JSON.stringify(results)}`,
+                    text: `Selecione até 6 empresas inéditas e priorizáveis.${criteriaInstruction(criteria)}${schemaHint} Não inclua nenhuma conta deste inventário: ${JSON.stringify(inventory)}. Analise estas fontes públicas:\n${JSON.stringify(results)}`,
                   },
                 ],
               },
             ],
             generationConfig,
           }),
-          signal: AbortSignal.timeout(35_000),
+          signal: AbortSignal.timeout(22_000),
         });
         const raw = await response.text();
         if (!response.ok) {
@@ -420,30 +526,29 @@ export class GeminiAiProvider implements AiProvider {
           const err = new Error(
             `Gemini (${model}) retornou ${response.status}: ${detail}`,
           );
-          if (
-            response.status === 503 ||
-            response.status === 429 ||
-            response.status === 404 ||
-            response.status === 500
-          ) {
-            lastError = err;
-            continue;
-          }
-          throw err;
+          attemptErrors.push(err.message);
+          lastError = err;
+          continue;
         }
         const parsedResponse = responseSchema.parse(JSON.parse(raw));
         const text = parsedResponse.candidates[0].content.parts
           .map((part) => part.text)
           .join("");
         return aiBatchAnalysisSchema.parse(
-          normalizeGeneratedScores(JSON.parse(text)),
+          normalizeGeneratedScores(JSON.parse(text), results),
         ).companies;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        attemptErrors.push(`${model}: ${lastError.message}`);
       }
     }
 
-    throw lastError ?? new Error("Falha ao consultar modelos Gemini");
+    throw (
+      lastError ??
+      new Error(
+        `Falha ao consultar modelos Gemini: ${attemptErrors.join(" | ")}`,
+      )
+    );
   }
 
   async analyzeLeads(

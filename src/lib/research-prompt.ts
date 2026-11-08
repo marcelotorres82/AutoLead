@@ -40,10 +40,8 @@ ${verticalTaxonomyPrompt()}
 - Se o core business pertencer a um setor financeiro, industrial, hospitalar ou fora de escopo, NÃO INCLUA A EMPRESA.
 
 QUALIFICAÇÃO E EXTRAÇÃO DE EVIDÊNCIAS
-- Extraia TODAS as empresas reais identificadas nas fontes fornecidas que atuem no Brasil e pertençam a uma das 9 verticais permitidas (até 10 empresas por lote).
-- Em cada item de evidence, preencha sourceUrl (URL exata presente nas fontes), kind ("fact", "signal" ou "hypothesis") e content (resumo objetivo da evidência com pelo menos 20 caracteres). Quando houver trecho literal na fonte com pelo menos 30 caracteres, preencha quote com o trecho literal sem traduzir; caso contrário, use null em quote.
-- Quando a evidência abordar porte/funcionários, tecnologia/arquitetura digital, expansão/crescimento recente ou plano/roadmap, preencha criterion com "headcount", "technology", "growth" ou "roadmap" (ou null quando for evidência institucional geral). Preencha headcount apenas com número inteiro positivo quando houver número de funcionários explícito (ou null caso contrário), e publishedAt com a data da fonte quando disponível (ou null).
-- Mesmo que uma empresa tenha apenas evidência institucional e de operação no Brasil em uma das 9 verticais (sem menção explícita a roadmap 2027 ou headcount exato no snippet), INCLUA a empresa para que ela passe pelo pipeline determinístico de enriquecimento web.
+- Extraia TODAS as empresas reais identificadas nas fontes fornecidas que atuem no Brasil e pertençam a uma das 9 verticais permitidas (até 6 empresas por lote).
+- Em cada item de evidence, preencha sourceUrl (URL exata presente nas fontes), kind ("fact", "signal" ou "hypothesis") e content (resumo objetivo ou trecho literal da evidência com pelo menos 20 caracteres).
 - Empresas jurídicas pertencem a Business Services / Escritórios de advocacia e serviços jurídicos, quando esse for seu core business.
 
 REGRAS DE EVIDÊNCIA E ANÁLISE COMERCIAL
